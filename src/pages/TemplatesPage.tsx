@@ -11,17 +11,54 @@ import {
   insertAtCursor,
   type PlaceholderSample,
 } from '../lib/templatePlaceholders.ts';
+import type { TemplateCategory, TemplateStatus } from '../types/api.ts';
+
+const CATEGORIES: { value: TemplateCategory; label: string; hint: string }[] = [
+  { value: 'UTILITY', label: 'Utility', hint: 'Order updates, reminders, confirmations' },
+  { value: 'MARKETING', label: 'Marketing', hint: 'Offers, promotions, announcements' },
+  { value: 'AUTHENTICATION', label: 'Authentication', hint: 'One-time passcodes' },
+];
+
+const STATUS_STYLES: Record<TemplateStatus, string> = {
+  local: 'bg-zinc-200/80 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400',
+  PENDING: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
+  APPROVED: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
+  REJECTED: 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300',
+  PAUSED: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300',
+  DISABLED: 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300',
+  IN_APPEAL: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300',
+};
+
+const STATUS_LABELS: Record<TemplateStatus, string> = {
+  local: 'Not submitted',
+  PENDING: 'Pending review',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  PAUSED: 'Paused',
+  DISABLED: 'Disabled',
+  IN_APPEAL: 'In appeal',
+};
+
+function StatusBadge({ status }: { status?: TemplateStatus }) {
+  const s = status ?? 'local';
+  return (
+    <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ${STATUS_STYLES[s]}`}>
+      {STATUS_LABELS[s]}
+    </span>
+  );
+}
 
 export function TemplatesPage() {
   const companyId = useAuthStore((s) => s.companyId);
   const workspaceRole = useAuthStore((s) => s.workspaceRole);
   const q = useTemplatesQuery();
-  const { create, remove } = useTemplateMutations();
+  const { create, remove, submit, sync } = useTemplateMutations();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
   const [language, setLanguage] = useState('en');
   const [imageUrl, setImageUrl] = useState('');
+  const [category, setCategory] = useState<TemplateCategory>('UTILITY');
   const [previewMode, setPreviewMode] = useState<'tokens' | 'filled'>('tokens');
   const [sample, setSample] = useState<PlaceholderSample>(DEFAULT_PREVIEW_SAMPLE);
   const [err, setErr] = useState<string | null>(null);
@@ -41,11 +78,30 @@ export function TemplatesPage() {
         name,
         body,
         language,
+        category,
         ...(imageUrl.trim() ? { imageUrl: imageUrl.trim() } : {}),
       });
       setName('');
       setBody('');
       setImageUrl('');
+    } catch (er) {
+      setErr(apiErrorMessage(er));
+    }
+  }
+
+  async function onSubmitForApproval(id: string) {
+    setErr(null);
+    try {
+      await submit.mutateAsync(id);
+    } catch (er) {
+      setErr(apiErrorMessage(er));
+    }
+  }
+
+  async function onSync() {
+    setErr(null);
+    try {
+      await sync.mutateAsync();
     } catch (er) {
       setErr(apiErrorMessage(er));
     }
@@ -145,6 +201,24 @@ export function TemplatesPage() {
                 />
               </label>
 
+              <label className="block text-sm">
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">Category</span>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  Meta rejects templates filed under the wrong category — promotional content must be Marketing.
+                </p>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as TemplateCategory)}
+                  className="mt-1.5 w-full max-w-xs rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label} — {c.hint}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <button
                 type="submit"
                 disabled={create.isPending || !companyId}
@@ -232,6 +306,22 @@ export function TemplatesPage() {
         </WorkspaceCard>
       ) : (
         <WorkspaceCard title="Saved templates">
+          {canManage ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200/80 bg-zinc-50/60 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                Campaigns can only send <strong>approved</strong> templates. Submit a template, then refresh to see
+                Meta&rsquo;s verdict — approval takes 15 minutes to 24 hours.
+              </p>
+              <button
+                type="button"
+                onClick={() => void onSync()}
+                disabled={sync.isPending}
+                className="shrink-0 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-white disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                {sync.isPending ? 'Refreshing…' : 'Refresh status from Meta'}
+              </button>
+            </div>
+          ) : null}
           <ul className="space-y-4">
             {sortedTemplates.map((t) => (
               <li
@@ -240,25 +330,48 @@ export function TemplatesPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-zinc-900 dark:text-white">{t.name}</span>
                       {t.language ? (
-                        <span className="ml-2 rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                        <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                           {t.language}
                         </span>
                       ) : null}
+                      {t.category ? (
+                        <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                          {t.category}
+                        </span>
+                      ) : null}
+                      <StatusBadge status={t.status} />
                     </div>
                     {canManage ? (
-                      <button
-                        type="button"
-                        className="shrink-0 text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
-                        disabled={remove.isPending}
-                        onClick={() => void remove.mutateAsync(t._id)}
-                      >
-                        Delete
-                      </button>
+                      <div className="flex shrink-0 items-center gap-3">
+                        {t.status !== 'APPROVED' && t.status !== 'PENDING' ? (
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 dark:text-emerald-400"
+                            disabled={submit.isPending}
+                            onClick={() => void onSubmitForApproval(t._id)}
+                          >
+                            {submit.isPending ? 'Submitting…' : 'Submit for approval'}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                          disabled={remove.isPending}
+                          onClick={() => void remove.mutateAsync(t._id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     ) : null}
                   </div>
+                  {t.status === 'REJECTED' && t.rejectedReason ? (
+                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800 dark:bg-red-950/40 dark:text-red-300">
+                      Meta rejected this: {t.rejectedReason}
+                    </p>
+                  ) : null}
                   <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{t.body}</p>
                   {t.imageUrl ? (
                     <p className="mt-2 truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { WorkspaceSummary } from '../types/api.ts';
+import type { WorkspaceSummary } from '../../types/api.ts';
 
 type Props = {
   summary: WorkspaceSummary | undefined;

@@ -57,12 +57,32 @@ export type Campaign = {
   createdAt: string;
 };
 
+/** Meta review states; `local` means never submitted for approval. */
+export type TemplateStatus =
+  | 'local'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PAUSED'
+  | 'DISABLED'
+  | 'IN_APPEAL';
+
+export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+
 export type Template = {
   _id: string;
   name: string;
   body: string;
   language?: string;
   imageUrl?: string;
+  status?: TemplateStatus;
+  category?: TemplateCategory;
+  metaTemplateId?: string;
+  metaTemplateName?: string;
+  variables?: string[];
+  rejectedReason?: string;
+  submittedAt?: string;
+  syncedAt?: string;
 };
 
 export type WhatsappNumber = {

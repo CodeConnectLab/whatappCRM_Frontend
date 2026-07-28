@@ -19,6 +19,7 @@ import type {
   Paginated,
   TeamMember,
   Template,
+  TemplateCategory,
   TransactionRow,
   TwilioAccountRow,
   Wallet,
@@ -328,15 +329,31 @@ export function useTemplateMutations() {
   const qc = useQueryClient();
   const companyId = useAuthStore((s) => s.companyId);
   const create = useMutation({
-    mutationFn: async (body: { name: string; body: string; language?: string; imageUrl?: string }) =>
-      (await api.post<Template>('/api/templates', body)).data,
+    mutationFn: async (body: {
+      name: string;
+      body: string;
+      language?: string;
+      imageUrl?: string;
+      category?: TemplateCategory;
+    }) => (await api.post<Template>('/api/templates', body)).data,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['templates', companyId] }),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => (await api.delete(`/api/templates/${id}`)).data,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['templates', companyId] }),
   });
-  return { create, remove };
+  /** Sends the template to Meta for review; status becomes PENDING. */
+  const submit = useMutation({
+    mutationFn: async (id: string) => (await api.post<Template>(`/api/templates/${id}/submit`)).data,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['templates', companyId] }),
+  });
+  /** Pulls the latest approval status for every template from Meta. */
+  const sync = useMutation({
+    mutationFn: async () =>
+      (await api.post<{ checked: number; updated: number; remote: number }>('/api/templates/sync')).data,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['templates', companyId] }),
+  });
+  return { create, remove, submit, sync };
 }
 
 export function useAdminCreateCompanyMutation() {
