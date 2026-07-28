@@ -102,6 +102,7 @@ export type MetaWhatsappConfig = {
   accessTokenConfigured: boolean;
   appSecretConfigured: boolean;
   wabaId?: string;
+  appId?: string;
   webhookSlug?: string;
   webhookUrl: string | null;
   webhookVerifyToken?: string;

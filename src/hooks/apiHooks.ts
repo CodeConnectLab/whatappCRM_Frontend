@@ -156,6 +156,7 @@ export function useUpsertMetaWhatsappConfigMutation() {
       accessToken?: string;
       appSecret?: string;
       wabaId?: string;
+      appId?: string;
       webhookVerifyToken?: string;
       regenerateWebhookVerifyToken?: boolean;
     }) => (await api.post<MetaWhatsappConfig>('/api/meta/whatsapp-config', body)).data,

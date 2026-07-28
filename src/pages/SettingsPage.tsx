@@ -30,6 +30,7 @@ export function SettingsPage() {
   const [metaToken, setMetaToken] = useState('');
   const [metaAppSecret, setMetaAppSecret] = useState('');
   const [metaWabaId, setMetaWabaId] = useState('');
+  const [metaAppId, setMetaAppId] = useState('');
   const [metaVerifyTokenEdit, setMetaVerifyTokenEdit] = useState('');
   const [metaPhoneNumberId, setMetaPhoneNumberId] = useState('');
   const [metaDisplayPhone, setMetaDisplayPhone] = useState('');
@@ -59,8 +60,9 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (metaCfg.data?.wabaId) setMetaWabaId(metaCfg.data.wabaId);
+    if (metaCfg.data?.appId) setMetaAppId(metaCfg.data.appId);
     if (metaCfg.data?.webhookVerifyToken) setMetaVerifyTokenEdit(metaCfg.data.webhookVerifyToken);
-  }, [metaCfg.data?.wabaId, metaCfg.data?.webhookVerifyToken]);
+  }, [metaCfg.data?.wabaId, metaCfg.data?.appId, metaCfg.data?.webhookVerifyToken]);
 
   async function copyText(label: string, text: string) {
     try {
@@ -106,6 +108,7 @@ export function SettingsPage() {
         accessToken: metaToken.trim() || undefined,
         appSecret: metaAppSecret.trim() || undefined,
         wabaId: metaWabaId.trim() || undefined,
+        appId: metaAppId.trim() || undefined,
         webhookVerifyToken: metaVerifyTokenEdit.trim() || undefined,
       });
       setMetaToken('');
@@ -353,6 +356,22 @@ export function SettingsPage() {
                   value={metaWabaId}
                   onChange={(e) => setMetaWabaId(e.target.value)}
                   placeholder="76756565659623371"
+                  className={`${field} mt-1.5 font-mono text-[13px]`}
+                />
+              </div>
+              <div>
+                <label htmlFor="meta-app-id" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                  App ID <span className="font-normal text-zinc-400">(optional)</span>
+                </label>
+                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Only needed to upload template header images. Detected from your access token
+                  automatically — fill this in if a template submit reports it could not be found.
+                </p>
+                <input
+                  id="meta-app-id"
+                  value={metaAppId}
+                  onChange={(e) => setMetaAppId(e.target.value)}
+                  placeholder="1234567890123456"
                   className={`${field} mt-1.5 font-mono text-[13px]`}
                 />
               </div>
