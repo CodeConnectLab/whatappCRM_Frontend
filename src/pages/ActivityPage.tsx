@@ -1,10 +1,8 @@
-import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useActivityLogsQuery } from '../hooks/apiHooks.ts';
 import { useAuthStore } from '../store/authStore.ts';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
-import { WorkspaceCard, WorkspaceIntro } from '../components/workspace/WorkspaceSurface.tsx';
-import { WORKSPACE_PAGE_BTN_CLASS } from '../lib/workspaceUi.ts';
+import { CardNote, PageHeader, WorkspaceCard } from '../components/workspace/WorkspaceSurface.tsx';
 
 export function ActivityPage() {
   const companyId = useAuthStore((s) => s.companyId);
@@ -12,84 +10,82 @@ export function ActivityPage() {
   const q = useActivityLogsQuery(page);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 pb-4">
+    <div className="flex flex-col gap-[18px]">
       <NeedsCompanyBanner />
 
-      <WorkspaceIntro
-        kicker="Workspace"
+      <PageHeader
         title="Activity log"
-        description="Audit-style events for this company: registrations, campaign actions, wallet moves, and other operations logged by the API."
+        description="Audit-style events for this company: registrations, campaign actions, wallet moves and other API operations."
       />
 
-      <WorkspaceCard title="Recent events">
+      <WorkspaceCard title="Recent events" flush>
         {!companyId ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace.</p>
+          <div className="p-4">
+            <CardNote>Select a workspace.</CardNote>
+          </div>
         ) : q.isLoading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+          <div className="p-4">
+            <CardNote>Loading…</CardNote>
+          </div>
         ) : q.isError ? (
-          <p className="text-sm text-red-600 dark:text-red-400">Could not load activity.</p>
+          <div className="p-4">
+            <CardNote>Could not load activity.</CardNote>
+          </div>
         ) : !q.data?.data.length ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">No activity recorded yet.</p>
+          <div className="p-4">
+            <CardNote>No activity recorded yet.</CardNote>
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-zinc-200 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+            <table className="dc-table dc-table-hover min-w-[640px]">
+              <thead className="bg-muted">
                 <tr>
-                  <th className="pb-3 pr-4">When</th>
-                  <th className="pb-3 pr-4">Action</th>
-                  <th className="pb-3 pr-4">Resource</th>
-                  <th className="pb-3">Who</th>
+                  <th className="pl-4">When</th>
+                  <th>Action</th>
+                  <th>Resource</th>
+                  <th className="pr-4">Who</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              <tbody>
                 {q.data.data.map((row) => (
-                  <tr key={row._id} className="text-zinc-800 dark:text-zinc-200">
-                    <td className="py-3 pr-4 whitespace-nowrap tabular-nums text-xs text-zinc-500 dark:text-zinc-400">
+                  <tr key={row._id}>
+                    <td className="whitespace-nowrap pl-4 text-sm tabular-nums text-ink-3">
                       {new Date(row.createdAt).toLocaleString()}
                     </td>
-                    <td className="py-3 pr-4 font-mono text-xs">{row.action}</td>
-                    <td className="py-3 pr-4 text-xs text-zinc-600 dark:text-zinc-300">
-                      {row.resource ?? '—'}
-                    </td>
-                    <td className="py-3 text-xs">
-                      {row.userId?.name ?? row.userId?.email ?? '—'}
-                    </td>
+                    <td className="font-mono text-sm">{row.action}</td>
+                    <td className="text-sm text-ink-3">{row.resource ?? '—'}</td>
+                    <td className="pr-4 text-sm">{row.userId?.name ?? row.userId?.email ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        {q.data ? (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className={WORKSPACE_PAGE_BTN_CLASS}
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className={WORKSPACE_PAGE_BTN_CLASS}
-              disabled={page * q.data.limit >= q.data.total}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </button>
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              Page {page} · {q.data.total} total
-            </span>
-          </div>
-        ) : null}
       </WorkspaceCard>
 
-      <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-        <Link to="/" className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">
-          ← Back to dashboard
-        </Link>
-      </p>
+      {q.data ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="dc-btn dc-btn-sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            className="dc-btn dc-btn-sm"
+            disabled={page * q.data.limit >= q.data.total}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </button>
+          <span className="text-sm text-ink-3">
+            Page {page} · {q.data.total} total
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

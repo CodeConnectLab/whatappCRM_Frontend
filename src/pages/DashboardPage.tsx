@@ -3,270 +3,322 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.ts';
 import { useAuthStore } from '../store/authStore.ts';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
-import { WorkspaceCard, WorkspaceIntro } from '../components/workspace/WorkspaceSurface.tsx';
+import {
+  Avatar,
+  CardNote,
+  PageHeader,
+  WorkspaceCard,
+} from '../components/workspace/WorkspaceSurface.tsx';
 import {
   useActivityLogsQuery,
   useChatsQuery,
   useTemplatesQuery,
   useWorkspaceSummaryQuery,
 } from '../hooks/apiHooks.ts';
-import {
-  IconActivity,
-  IconChat,
-  IconContact,
-  IconMegaphone,
-  IconSettings,
-  IconTemplate,
-  IconWallet,
-} from '../components/Icons.tsx';
+import { IconChevronRight, IconPlus } from '../components/Icons.tsx';
 import { MetaSetupStatus } from '../components/settings/MetaSetupStatus.tsx';
 import type { Wallet } from '../types/api.ts';
+
+/** Big number + caption + call to action, laid out as one cell of a strip. */
+function AttentionCell(props: {
+  to: string;
+  value: string | number;
+  label: string;
+  cta: string;
+  tone?: 'default' | 'alert';
+}) {
+  return (
+    <Link
+      to={props.to}
+      className="flex flex-col gap-1 border-b border-r border-line-soft p-4 transition-colors last:border-r-0 hover:bg-muted"
+    >
+      <span
+        className={`text-stat font-semibold tracking-[-0.02em] tabular-nums ${
+          props.tone === 'alert' ? 'text-danger' : 'text-ink'
+        }`}
+      >
+        {props.value}
+      </span>
+      <span className="text-base text-ink-3">{props.label}</span>
+      <span className="mt-1 text-sm text-brand">{props.cta} →</span>
+    </Link>
+  );
+}
+
+function formatWhen(iso: string): string {
+  const then = new Date(iso).getTime();
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60 * 24) return `${Math.round(mins / 60)}h ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 
 export function DashboardPage() {
   const companyId = useAuthStore((s) => s.companyId);
   const user = useAuthStore((s) => s.user);
   const companyName = useAuthStore((s) => s.companyName);
-  const q = useQuery({
+
+  const walletQ = useQuery({
     queryKey: ['wallet', companyId],
     enabled: Boolean(companyId),
     queryFn: async () => (await api.get<Wallet>('/api/wallet')).data,
   });
-
   const summary = useWorkspaceSummaryQuery();
   const templatesQ = useTemplatesQuery();
   const chatsQ = useChatsQuery();
   const activityQ = useActivityLogsQuery(1);
 
   const greeting = user?.name?.split(/\s+/)[0] ?? 'there';
+  const chats = chatsQ.data ?? [];
+  const unread = chats.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
 
-  const quick = [
-    { to: '/chats', label: 'Live chats', desc: 'Inbox & realtime', icon: IconChat },
-    { to: '/contacts', label: 'Contacts', desc: 'Lists & groups', icon: IconContact },
-    { to: '/campaigns', label: 'Campaigns', desc: 'Broadcasts', icon: IconMegaphone },
-    { to: '/templates', label: 'Templates', desc: 'Saved messages', icon: IconTemplate },
-    { to: '/activity', label: 'Activity', desc: 'Audit log', icon: IconActivity },
-    { to: '/wallet', label: 'Wallet', desc: 'Credits & usage', icon: IconWallet },
-    { to: '/settings', label: 'Settings', desc: 'Meta WhatsApp & company', icon: IconSettings },
-  ] as const;
+  const dash = (node: unknown, loading: boolean) => (!companyId ? '—' : loading ? '…' : String(node ?? 0));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="flex flex-col gap-5">
       <NeedsCompanyBanner />
 
-      <WorkspaceIntro
-        kicker="Overview"
+      <PageHeader
         title={`Hello, ${greeting}`}
-        description={
-          companyName
-            ? `You are working in ${companyName}. Manage WhatsApp campaigns, templates, and live conversations from one place.`
-            : 'Select a workspace to load tenant data and start using the console.'
+        description={companyName ? `${companyName} · ${today}` : 'Select a workspace to load tenant data.'}
+        actions={
+          <>
+            <Link to="/templates" className="dc-btn">
+              Templates
+            </Link>
+            <Link to="/campaigns" className="dc-btn dc-btn-primary">
+              <IconPlus className="h-3.5 w-3.5" />
+              New campaign
+            </Link>
+          </>
         }
       />
 
       {user?.isSuperAdmin && companyId ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+        <div className="dc-note dc-note-warn">
           <span className="font-medium">Super admin</span>
-          <span className="rounded-md bg-amber-100/80 px-2 py-0.5 font-mono text-xs dark:bg-amber-900/50">
+          <span className="rounded border border-warn-line bg-surface/50 px-1.5 py-px font-mono text-2xs">
             {companyId.slice(-8)}
           </span>
-          <span className="text-amber-800/90 dark:text-amber-200/90">Switch tenant from</span>
-          <Link
-            className="font-semibold text-amber-900 underline decoration-amber-400 underline-offset-2 hover:text-amber-950 dark:text-amber-100"
-            to="/companies"
-          >
-            Companies
+          <span>Working inside this tenant.</span>
+          <Link to="/companies" className="font-medium underline underline-offset-2">
+            Switch workspace
           </Link>
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <WorkspaceCard title="At a glance">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl border border-zinc-100 bg-zinc-50/80 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950/40">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Chats
-              </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-white">
-                {!companyId ? '—' : summary.isLoading ? '…' : (summary.data?.chatCount ?? 0)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-zinc-100 bg-zinc-50/80 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950/40">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Templates
-              </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-white">
-                {!companyId ? '—' : summary.isLoading ? '…' : (summary.data?.templateCount ?? 0)}
-              </p>
-            </div>
-            <div className="col-span-2 rounded-xl border border-zinc-100 bg-zinc-50/80 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-950/40">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Messaging
-              </p>
-              <div className="mt-2">
-                <MetaSetupStatus summary={summary.data} compact />
-              </div>
-            </div>
-          </div>
-        </WorkspaceCard>
+      {/* Needs attention -------------------------------------------------- */}
+      <section className="dc-card">
+        <div className="dc-card-head">
+          <span className="h-1.5 w-1.5 rounded-full bg-danger" />
+          <h2 className="dc-card-title">Needs attention</h2>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          <AttentionCell
+            to="/chats"
+            value={dash(unread, chatsQ.isLoading)}
+            label="Unread messages"
+            cta="Open inbox"
+            tone={unread > 0 ? 'alert' : 'default'}
+          />
+          <AttentionCell
+            to="/chats"
+            value={dash(summary.data?.chatCount, summary.isLoading)}
+            label="Conversations"
+            cta="Go to inbox"
+          />
+          <AttentionCell
+            to="/templates"
+            value={dash(summary.data?.templateCount, summary.isLoading)}
+            label="Templates"
+            cta="Manage"
+          />
+          <AttentionCell
+            to="/wallet"
+            value={dash(walletQ.data?.balance, walletQ.isLoading)}
+            label="Credits left"
+            cta="Top up"
+            tone={(walletQ.data?.balance ?? 0) <= 0 ? 'alert' : 'default'}
+          />
+        </div>
+      </section>
 
-        <WorkspaceCard title="Recent chats">
+      {/* Messaging status ------------------------------------------------- */}
+      <WorkspaceCard title="Messaging channel" action={<Link to="/settings" className="dc-btn-link">Settings</Link>}>
+        {!companyId ? (
+          <CardNote>Select a workspace.</CardNote>
+        ) : summary.isLoading ? (
+          <CardNote>Loading…</CardNote>
+        ) : (
+          <MetaSetupStatus summary={summary.data} />
+        )}
+      </WorkspaceCard>
+
+      {/* Two-column detail ------------------------------------------------ */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <WorkspaceCard
+          title="Recent chats"
+          action={
+            <Link to="/chats" className="dc-btn-link">
+              View all
+            </Link>
+          }
+          flush
+        >
           {!companyId ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace.</p>
+            <div className="p-4">
+              <CardNote>Select a workspace.</CardNote>
+            </div>
           ) : chatsQ.isLoading ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
-          ) : !(chatsQ.data ?? []).length ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">No conversations yet.</p>
+            <div className="p-4">
+              <CardNote>Loading…</CardNote>
+            </div>
+          ) : !chats.length ? (
+            <div className="p-4">
+              <CardNote>No conversations yet.</CardNote>
+            </div>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {(chatsQ.data ?? []).slice(0, 6).map((c) => (
-                <li key={c._id} className="py-2.5 first:pt-0 last:pb-0">
-                  <Link
-                    to={`/chats?chat=${encodeURIComponent(c._id)}`}
-                    className="block text-sm font-medium text-zinc-900 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-400"
-                  >
-                    {c.contactId?.name || c.contactId?.phone || 'Chat'}
-                  </Link>
-                  <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    {c.lastMessagePreview ?? '—'}
-                  </p>
-                </li>
-              ))}
+            <ul>
+              {chats.slice(0, 6).map((c) => {
+                const name = c.contactId?.name || c.contactId?.phone || 'Chat';
+                return (
+                  <li key={c._id} className="border-b border-line-faint last:border-b-0">
+                    <Link
+                      to={`/chats?chat=${encodeURIComponent(c._id)}`}
+                      className="flex items-center gap-2.5 px-4 py-3 transition-colors hover:bg-muted"
+                    >
+                      <Avatar name={name} className="h-8 w-8 text-xs" />
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-base font-medium text-ink">{name}</span>
+                        <span className="truncate text-sm text-ink-3">{c.lastMessagePreview ?? '—'}</span>
+                      </div>
+                      {c.unreadCount ? (
+                        <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-white">
+                          {c.unreadCount}
+                        </span>
+                      ) : c.lastMessageAt ? (
+                        <span className="shrink-0 text-xs text-ink-4">{formatWhen(c.lastMessageAt)}</span>
+                      ) : null}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
-          <Link
-            to="/chats"
-            className="mt-3 inline-block text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
-          >
-            Open inbox →
-          </Link>
         </WorkspaceCard>
 
-        <WorkspaceCard title="Templates">
+        <WorkspaceCard
+          title="Templates"
+          action={
+            <Link to="/templates" className="dc-btn-link">
+              Manage
+            </Link>
+          }
+          flush
+        >
           {!companyId ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace.</p>
+            <div className="p-4">
+              <CardNote>Select a workspace.</CardNote>
+            </div>
           ) : templatesQ.isLoading ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+            <div className="p-4">
+              <CardNote>Loading…</CardNote>
+            </div>
           ) : !(templatesQ.data ?? []).length ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">No templates yet.</p>
+            <div className="p-4">
+              <CardNote>No templates yet.</CardNote>
+            </div>
           ) : (
-            <ul className="space-y-2">
+            <ul>
               {(templatesQ.data ?? []).slice(0, 6).map((t) => (
                 <li
                   key={t._id}
-                  className="rounded-lg border border-zinc-100 bg-zinc-50/60 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950/30"
+                  className="flex flex-col gap-1 border-b border-line-faint px-4 py-3 last:border-b-0"
                 >
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">{t.name}</p>
-                  <p className="mt-0.5 line-clamp-2 text-xs text-zinc-600 dark:text-zinc-400">{t.body}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-base font-medium text-ink">{t.name}</span>
+                    <span
+                      className={`dc-badge ml-auto ${
+                        t.status === 'APPROVED'
+                          ? 'dc-badge-brand'
+                          : t.status === 'REJECTED'
+                            ? 'dc-badge-danger'
+                            : t.status === 'PENDING'
+                              ? 'dc-badge-warn'
+                              : ''
+                      }`}
+                    >
+                      {t.status ?? 'local'}
+                    </span>
+                  </div>
+                  <p className="line-clamp-2 text-sm text-ink-3">{t.body}</p>
                 </li>
               ))}
             </ul>
           )}
-          <Link
-            to="/templates"
-            className="mt-3 inline-block text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
-          >
-            Manage templates →
-          </Link>
-        </WorkspaceCard>
-
-        <WorkspaceCard title="Latest activity">
-          {!companyId ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace.</p>
-          ) : activityQ.isLoading ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
-          ) : !(activityQ.data?.data ?? []).length ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">No log entries yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {activityQ.data!.data.slice(0, 6).map((row) => (
-                <li
-                  key={row._id}
-                  className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-zinc-100 px-3 py-2 text-xs dark:border-zinc-800"
-                >
-                  <span className="font-mono font-medium text-zinc-800 dark:text-zinc-200">{row.action}</span>
-                  <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
-                    {new Date(row.createdAt).toLocaleString()}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link
-            to="/activity"
-            className="mt-3 inline-block text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
-          >
-            Full activity log →
-          </Link>
         </WorkspaceCard>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <WorkspaceCard>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Credits</p>
-            <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-              Wallet
-            </span>
+      <WorkspaceCard
+        title="Latest activity"
+        action={
+          <Link to="/activity" className="dc-btn-link">
+            Full log
+          </Link>
+        }
+        flush
+      >
+        {!companyId ? (
+          <div className="p-4">
+            <CardNote>Select a workspace.</CardNote>
           </div>
-          <p className="mt-3 text-4xl font-bold tabular-nums tracking-tight text-zinc-900 dark:text-white">
-            {!companyId ? '—' : q.isLoading ? '…' : q.data?.balance ?? '0'}
-          </p>
-          <p className="mt-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Charged on successful outbound sends from chats and campaigns.
-          </p>
-          {q.isError ? (
-            <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">Wallet unavailable for this workspace.</p>
-          ) : null}
-        </WorkspaceCard>
-
-        <WorkspaceCard className="sm:col-span-2 lg:col-span-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Get setup</p>
-          <div className="mt-4">
-            <MetaSetupStatus summary={summary.data} />
+        ) : activityQ.isLoading ? (
+          <div className="p-4">
+            <CardNote>Loading…</CardNote>
           </div>
-          <ol className="mt-4 space-y-4">
-            {[
-              { n: '1', text: 'Connect Meta & your default WhatsApp sender', href: '/settings' },
-              { n: '2', text: 'Import contacts and create a message template', href: '/contacts' },
-              { n: '3', text: 'Open Live chats for real-time inbox updates', href: '/chats' },
-            ].map((step) => (
-              <li key={step.n} className="flex gap-4">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-bold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                  {step.n}
-                </span>
-                <div>
-                  <Link
-                    to={step.href}
-                    className="text-sm font-medium text-zinc-900 hover:text-emerald-700 dark:text-white dark:hover:text-emerald-400"
-                  >
-                    {step.text}
-                  </Link>
-                </div>
+        ) : !(activityQ.data?.data ?? []).length ? (
+          <div className="p-4">
+            <CardNote>No log entries yet.</CardNote>
+          </div>
+        ) : (
+          <ul>
+            {(activityQ.data?.data ?? []).slice(0, 8).map((row) => (
+              <li
+                key={row._id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line-faint px-4 py-2.5 last:border-b-0"
+              >
+                <span className="font-mono text-sm text-ink-2">{row.action}</span>
+                {row.userId?.name || row.userId?.email ? (
+                  <span className="text-sm text-ink-3">{row.userId.name ?? row.userId.email}</span>
+                ) : null}
+                <span className="ml-auto text-xs tabular-nums text-ink-4">{formatWhen(row.createdAt)}</span>
               </li>
             ))}
-          </ol>
-        </WorkspaceCard>
-      </div>
-
-      <WorkspaceCard title="Shortcuts">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {quick.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="group flex gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-4 transition-all hover:border-emerald-300/60 hover:bg-white hover:shadow-md dark:border-zinc-800/80 dark:bg-zinc-950/30 dark:hover:border-emerald-800/50 dark:hover:bg-zinc-900/80"
-            >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-zinc-100 bg-white text-zinc-600 shadow-sm transition-colors group-hover:border-emerald-200 group-hover:bg-emerald-50 group-hover:text-emerald-700 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300 dark:group-hover:border-emerald-800 dark:group-hover:bg-emerald-950/40 dark:group-hover:text-emerald-300">
-                <item.icon className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <div className="font-semibold text-zinc-900 dark:text-white">{item.label}</div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">{item.desc}</div>
-              </div>
-            </Link>
-          ))}
-        </div>
+          </ul>
+        )}
       </WorkspaceCard>
+
+      {/* Setup checklist -------------------------------------------------- */}
+      {!summary.data?.metaReadyForCampaigns ? (
+        <section className="dc-card flex flex-wrap items-center gap-4 p-4">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-base font-semibold text-ink">Finish setup</span>
+            <span className="text-base text-ink-3">
+              Connect Meta WhatsApp and a default sender before starting campaigns.
+            </span>
+          </div>
+          <Link to="/settings" className="dc-btn dc-btn-primary ml-auto">
+            Connect WhatsApp
+            <IconChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </section>
+      ) : null}
     </div>
   );
 }

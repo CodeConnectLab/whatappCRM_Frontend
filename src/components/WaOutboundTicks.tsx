@@ -5,14 +5,14 @@ export function WaOutboundTicks(props: { status: string; statusDetail?: string }
 
   if (s === 'failed') {
     return (
-      <span className="font-bold text-red-600 dark:text-red-400" title={failTitle}>
+      <span className="font-semibold text-danger" title={failTitle}>
         !
       </span>
     );
   }
   if (s === 'queued') {
     return (
-      <span className="tracking-tight text-zinc-400" title="Sending">
+      <span className="tracking-tight text-ink-4" title="Sending">
         ···
       </span>
     );
@@ -21,7 +21,7 @@ export function WaOutboundTicks(props: { status: string; statusDetail?: string }
   const tick = 'h-3.5 w-3.5 shrink-0';
   if (s === 'sent') {
     return (
-      <span className="inline-flex items-center text-zinc-500/90 dark:text-zinc-400/90" title="Sent">
+      <span className="inline-flex items-center" title="Sent">
         <CheckIcon className={tick} />
       </span>
     );
@@ -29,15 +29,8 @@ export function WaOutboundTicks(props: { status: string; statusDetail?: string }
   if (s === 'delivered' || s === 'read') {
     const read = s === 'read';
     return (
-      <span
-        className={
-          read
-            ? 'inline-flex items-center text-sky-600 dark:text-sky-400'
-            : 'inline-flex items-center text-zinc-500/90 dark:text-zinc-400/90'
-        }
-        title={read ? 'Read' : 'Delivered'}
-      >
-        <CheckIcon className={`${tick} -mr-[7px] opacity-95`} />
+      <span className={`inline-flex items-center ${read ? 'text-accent' : ''}`} title={read ? 'Read' : 'Delivered'}>
+        <CheckIcon className={`${tick} -mr-[7px]`} />
         <CheckIcon className={tick} />
       </span>
     );

@@ -9,9 +9,18 @@ import {
   useState,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { IconPaperclip, IconSmile } from '../components/Icons.tsx';
+import {
+  IconChevronDown,
+  IconClose,
+  IconInfo,
+  IconPaperclip,
+  IconPlus,
+  IconSearch,
+  IconSmile,
+} from '../components/Icons.tsx';
 import { WaOutboundTicks } from '../components/WaOutboundTicks.tsx';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
+import { Avatar } from '../components/workspace/WorkspaceSurface.tsx';
 import { useSocket } from '../hooks/useSocket.ts';
 import {
   useChatMessagesInfiniteQuery,
@@ -24,18 +33,6 @@ import { queryClient } from '../lib/queryClient.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { useAuthStore } from '../store/authStore.ts';
 
-function initialsFromLabel(label: string): string {
-  const p = label.trim().split(/\s+/).filter(Boolean);
-  if (p.length >= 2) {
-    const a = p[0]?.[0];
-    const b = p[1]?.[0];
-    if (a != null && b != null) return (a + b).toUpperCase();
-  }
-  const sole = p[0];
-  if (p.length === 1 && sole && sole.length >= 2) return sole.slice(0, 2).toUpperCase();
-  return (label.replace(/\D/g, '').slice(-2) || label.slice(0, 2) || '?').toUpperCase();
-}
-
 function formatMsgTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
@@ -43,6 +40,19 @@ function formatMsgTime(iso: string): string {
     return '';
   }
 }
+
+function formatDayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  if (same(d, today)) return 'Today';
+  if (same(d, yesterday)) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+type ListFilter = 'all' | 'unread';
 
 export function ChatsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -66,6 +76,11 @@ export function ChatsPage() {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const contactsQ = useContactsQuery(1, contactSearch);
+
+  const [listQuery, setListQuery] = useState('');
+  const [listFilter, setListFilter] = useState<ListFilter>('all');
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [listOpenMobile, setListOpenMobile] = useState(false);
 
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -103,7 +118,6 @@ export function ChatsPage() {
   );
 
   const { emitTyping } = useSocket(handleSocket);
-
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = msgQ;
 
   useEffect(() => {
@@ -131,8 +145,7 @@ export function ChatsPage() {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = '0px';
-    const next = Math.min(160, Math.max(48, ta.scrollHeight));
-    ta.style.height = `${next}px`;
+    ta.style.height = `${Math.min(140, Math.max(42, ta.scrollHeight))}px`;
   }, [draft]);
 
   useEffect(() => {
@@ -155,6 +168,7 @@ export function ChatsPage() {
       setChatId(chat._id);
       setNewChatOpen(false);
       setContactSearch('');
+      setListOpenMobile(false);
     } catch (er) {
       setSendErr(apiErrorMessage(er));
     }
@@ -178,337 +192,384 @@ export function ChatsPage() {
     await submitMessage();
   }
 
-  const chatCount = chatsQ.data?.length ?? 0;
+  const allChats = useMemo(() => chatsQ.data ?? [], [chatsQ.data]);
+  const unreadTotal = allChats.reduce((n, c) => n + (c.unreadCount ?? 0), 0);
+
+  const visibleChats = useMemo(() => {
+    const q = listQuery.trim().toLowerCase();
+    return allChats.filter((c) => {
+      if (listFilter === 'unread' && !(c.unreadCount ?? 0)) return false;
+      if (!q) return true;
+      const hay = `${c.contactId?.name ?? ''} ${c.contactId?.phone ?? ''} ${c.lastMessagePreview ?? ''}`;
+      return hay.toLowerCase().includes(q);
+    });
+  }, [allChats, listFilter, listQuery]);
+
+  const openChat = allChats.find((c) => c._id === chatId);
+  const openName = openChat?.contactId?.name || openChat?.contactId?.phone || 'Conversation';
+  const openPhone = openChat?.contactId?.phone ?? '';
+
+  if (!companyId) {
+    return (
+      <div className="flex flex-col gap-4 px-5 py-6 md:px-7">
+        <NeedsCompanyBanner />
+        <p className="text-base text-ink-3">Select a workspace to view chats.</p>
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------------- list */
+  const chatList = (
+    <div className="flex h-full min-h-0 flex-col bg-surface">
+      <div className="flex flex-col gap-2.5 border-b border-line-soft p-3.5 pb-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 flex-1 items-center gap-2 rounded-control border border-line bg-subtle px-2.5">
+            <IconSearch className="h-3.5 w-3.5 shrink-0 text-ink-4" />
+            <input
+              value={listQuery}
+              onChange={(e) => setListQuery(e.target.value)}
+              placeholder="Search chats"
+              className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-4"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setNewChatOpen((v) => !v)}
+            className="dc-btn dc-btn-sm dc-btn-primary w-[30px] px-0"
+            aria-label={newChatOpen ? 'Close new chat' : 'New chat'}
+          >
+            {newChatOpen ? <IconClose className="h-3.5 w-3.5" /> : <IconPlus className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setListFilter('all')}
+            className={`dc-pill ${listFilter === 'all' ? 'dc-pill-active' : ''}`}
+          >
+            All <span className="opacity-60 tabular-nums">{allChats.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setListFilter('unread')}
+            className={`dc-pill ${listFilter === 'unread' ? 'dc-pill-active' : ''}`}
+          >
+            Unread <span className="opacity-60 tabular-nums">{unreadTotal}</span>
+          </button>
+        </div>
+      </div>
+
+      {newChatOpen ? (
+        <div className="border-b border-line-soft bg-muted p-3">
+          <input
+            value={contactSearch}
+            onChange={(e) => setContactSearch(e.target.value)}
+            placeholder="Search contact by name or phone…"
+            className="dc-input h-8 text-sm"
+          />
+          <div className="mt-2 max-h-48 overflow-y-auto">
+            {contactsQ.isLoading ? (
+              <p className="py-2 text-sm text-ink-3">Loading contacts…</p>
+            ) : !(contactsQ.data?.data ?? []).length ? (
+              <p className="py-2 text-sm text-ink-3">No contacts found. Add contacts first.</p>
+            ) : (
+              (contactsQ.data?.data ?? []).map((c) => (
+                <button
+                  key={c._id}
+                  type="button"
+                  disabled={startChat.isPending}
+                  onClick={() => void onStartChat(c._id)}
+                  className="flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-base hover:bg-brand-soft"
+                >
+                  <span className="truncate font-medium text-ink">{c.name || c.phone}</span>
+                  {c.name ? <span className="ml-auto font-mono text-xs text-ink-4">{c.phone}</span> : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {chatsQ.isLoading ? (
+          <p className="p-4 text-base text-ink-3">Loading…</p>
+        ) : chatsQ.isError ? (
+          <p className="p-4 text-base text-danger">Failed to load chats.</p>
+        ) : !visibleChats.length ? (
+          <p className="p-6 text-center text-base text-ink-3">
+            {allChats.length ? 'No chats match this filter.' : 'No conversations yet. Start one with +.'}
+          </p>
+        ) : (
+          visibleChats.map((c) => {
+            const title = c.contactId?.name || c.contactId?.phone || 'Contact';
+            const active = c._id === chatId;
+            return (
+              <button
+                key={c._id}
+                type="button"
+                onClick={() => {
+                  setChatId(c._id);
+                  setListOpenMobile(false);
+                }}
+                className={`flex w-full gap-2.5 border-b border-line-faint border-l-2 px-3.5 py-3 text-left transition-colors ${
+                  active ? 'border-l-brand bg-subtle' : 'border-l-transparent bg-surface hover:bg-muted'
+                }`}
+              >
+                <Avatar name={title} className="h-[34px] w-[34px] text-sm" plain />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className={`truncate text-base text-ink ${c.unreadCount ? 'font-semibold' : 'font-medium'}`}
+                    >
+                      {title}
+                    </span>
+                    {c.lastMessageAt ? (
+                      <span className="ml-auto shrink-0 text-xs text-ink-4">{formatMsgTime(c.lastMessageAt)}</span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm text-ink-3">{c.lastMessagePreview ?? 'No preview'}</span>
+                    {c.unreadCount ? (
+                      <span className="ml-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-brand px-1.5 text-2xs font-semibold text-white">
+                        {c.unreadCount}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
-      <NeedsCompanyBanner />
+    <div className="flex h-full min-h-0 flex-1 overflow-hidden">
+      {/* Chat list — static column on desktop, drawer on mobile */}
+      <div className="hidden w-[300px] shrink-0 border-r border-line md:block">{chatList}</div>
+      {listOpenMobile ? (
+        <div className="dc-scrim md:hidden" onClick={() => setListOpenMobile(false)}>
+          <div className="h-full w-[min(20rem,88vw)] shadow-drawer" onClick={(e) => e.stopPropagation()}>
+            {chatList}
+          </div>
+        </div>
+      ) : null}
 
-      {!companyId ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace to view chats.</p>
-      ) : (
-        <>
-          {sendErr && !chatId ? (
-            <p className="text-sm font-medium text-red-600 dark:text-red-400">{sendErr}</p>
-          ) : null}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-card ring-1 ring-zinc-950/[0.03] dark:border-zinc-800/80 dark:bg-zinc-900/50 dark:ring-white/[0.04] md:flex-row">
-          <aside className="hidden w-80 shrink-0 flex-col border-b border-zinc-200 bg-zinc-50/90 dark:border-zinc-800 dark:bg-zinc-950/50 md:flex md:border-b-0 md:border-r">
-            <div className="flex items-center justify-between border-b border-zinc-200/80 px-4 py-3.5 dark:border-zinc-800">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Inbox</p>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                  Conversations
-                  {chatCount > 0 ? (
-                    <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-200">
-                      {chatCount}
-                    </span>
-                  ) : null}
-                </p>
+      {/* Thread */}
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-subtle">
+        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line bg-surface px-3.5 md:px-4">
+          <button
+            type="button"
+            className="dc-btn dc-btn-sm w-[30px] px-0 md:hidden"
+            onClick={() => setListOpenMobile(true)}
+            aria-label="Open chat list"
+          >
+            <IconChevronDown className="h-3.5 w-3.5 rotate-90" />
+          </button>
+
+          {chatId ? (
+            <>
+              <Avatar name={openName} className="h-8 w-8 text-sm" plain />
+              <div className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate text-md font-semibold text-ink">{openName}</span>
+                <span className="truncate text-sm text-ink-4">
+                  {openPhone ? `${openPhone} · ` : ''}WhatsApp
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setNewChatOpen((v) => !v)}
-                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500"
-              >
-                {newChatOpen ? 'Close' : 'New chat'}
-              </button>
-            </div>
-            {newChatOpen ? (
-              <div className="border-b border-zinc-200/80 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-                <input
-                  value={contactSearch}
-                  onChange={(e) => setContactSearch(e.target.value)}
-                  placeholder="Search contact by name or phone…"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                />
-                <div className="mt-2 max-h-48 overflow-y-auto">
-                  {contactsQ.isLoading ? (
-                    <p className="py-2 text-xs text-zinc-500">Loading contacts…</p>
-                  ) : (contactsQ.data?.data ?? []).length === 0 ? (
-                    <p className="py-2 text-xs text-zinc-500">
-                      No contacts found. Add contacts first, then start a chat.
-                    </p>
-                  ) : (
-                    (contactsQ.data?.data ?? []).map((c) => (
-                      <button
-                        key={c._id}
-                        type="button"
-                        disabled={startChat.isPending}
-                        onClick={() => void onStartChat(c._id)}
-                        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                      >
-                        <span className="font-medium text-zinc-900 dark:text-white">
-                          {c.name || c.phone}
-                        </span>
-                        {c.name ? (
-                          <span className="font-mono text-xs text-zinc-500">{c.phone}</span>
-                        ) : null}
-                      </button>
-                    ))
-                  )}
-                </div>
+              <div className="ml-auto flex shrink-0 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen((v) => !v)}
+                  className={`dc-btn dc-btn-sm ${detailsOpen ? 'border-brand bg-brand-soft text-brand-ink' : ''}`}
+                >
+                  <IconInfo className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Details</span>
+                </button>
               </div>
-            ) : null}
-            <div className="flex-1 overflow-y-auto">
-              {chatsQ.isLoading ? (
-                <div className="p-4 text-sm text-zinc-500">Loading…</div>
-              ) : chatsQ.isError ? (
-                <div className="p-4 text-sm text-red-600 dark:text-red-400">Failed to load chats.</div>
-              ) : chatCount === 0 ? (
-                <div className="p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                  No conversations yet. Click <strong>New chat</strong> to message a contact, or wait for
-                  inbound WhatsApp messages.
-                </div>
+            </>
+          ) : (
+            <span className="text-md font-semibold text-ink">Inbox</span>
+          )}
+        </div>
+
+        {!chatId ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 p-8 text-center">
+            <p className="text-md font-semibold text-ink">Pick a conversation</p>
+            <p className="max-w-xs text-base text-ink-3">
+              Choose a contact from the list to read and reply, or start a new chat.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div
+              ref={scrollRef}
+              className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 py-5 md:px-6"
+              style={{ scrollBehavior: 'smooth' }}
+            >
+              <div ref={loadMoreRef} className="h-px w-full shrink-0" />
+              {isFetchingNextPage ? (
+                <p className="self-center text-xs text-ink-4">Loading older…</p>
+              ) : null}
+              {msgQ.isLoading ? (
+                <p className="self-center text-base text-ink-3">Loading messages…</p>
+              ) : msgQ.isError ? (
+                <p className="self-center text-base text-danger">Could not load messages.</p>
+              ) : !flatMessages.length ? (
+                <p className="self-center text-base text-ink-3">No messages yet — say hello.</p>
               ) : (
-                (chatsQ.data ?? []).map((c) => {
-                  const title = c.contactId?.name || c.contactId?.phone || 'Contact';
-                  const active = c._id === chatId;
-                  const ini = initialsFromLabel(title);
+                flatMessages.map((m, i) => {
+                  const out = m.direction === 'outbound';
+                  const prev = flatMessages[i - 1];
+                  const showDay =
+                    !prev || new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
                   return (
-                    <button
-                      key={c._id}
-                      type="button"
-                      onClick={() => setChatId(c._id)}
-                      className={`flex w-full gap-3 border-b border-zinc-100 px-4 py-3 text-left transition-colors dark:border-zinc-800/80 ${
-                        active
-                          ? 'bg-emerald-50 dark:bg-emerald-950/35'
-                          : 'hover:bg-white dark:hover:bg-zinc-900/60'
-                      }`}
-                    >
-                      <span
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold ${
-                          active
-                            ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-600/20'
-                            : 'border border-zinc-200/80 bg-white text-emerald-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-emerald-300'
+                    <div key={m._id} className="contents">
+                      {showDay ? (
+                        <span className="self-center rounded-full bg-line-soft px-2.5 py-0.5 text-xs text-ink-4">
+                          {formatDayLabel(m.createdAt)}
+                        </span>
+                      ) : null}
+                      <div
+                        className={`flex max-w-[min(88%,32rem)] flex-col gap-1.5 border px-3 py-2.5 ${
+                          out
+                            ? 'self-end rounded-[10px] rounded-br-[3px] border-brand-line bg-brand-soft'
+                            : 'self-start rounded-[10px] rounded-bl-[3px] border-line bg-surface'
                         }`}
                       >
-                        {ini}
-                      </span>
-                      <div className="min-w-0 flex-1 py-0.5">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate font-semibold text-zinc-900 dark:text-white">{title}</span>
-                        </div>
-                        <span className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-                          {c.lastMessagePreview ?? 'No preview'}
+                        <span className="whitespace-pre-wrap break-words text-base leading-relaxed text-ink">
+                          {m.body}
                         </span>
+                        <span
+                          className={`flex items-center gap-1.5 self-end text-2xs ${
+                            out ? 'text-brand-ink/75' : 'text-ink-4'
+                          }`}
+                        >
+                          <span className="tabular-nums">{formatMsgTime(m.createdAt)}</span>
+                          {out ? <WaOutboundTicks status={m.status} statusDetail={m.statusDetail} /> : null}
+                        </span>
+                        {out && m.status === 'failed' && m.statusDetail ? (
+                          <span className="text-2xs leading-snug text-danger">{m.statusDetail}</span>
+                        ) : null}
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               )}
-            </div>
-          </aside>
-
-          <section className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-[#e5ddd5] dark:bg-[#0b141a]">
-            <div
-              className="pointer-events-none absolute inset-0 z-0 opacity-[0.06] dark:opacity-[0.04]"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M32 0l32 32-32 32L0 32z' fill='%23000' fill-opacity='1'/%3E%3C/svg%3E")`,
-                backgroundSize: '64px 64px',
-              }}
-              aria-hidden
-            />
-
-            <div className="relative z-10 flex shrink-0 items-center gap-2 border-b border-black/10 bg-white/95 px-3 py-3 backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/95 md:hidden">
-              <button
-                type="button"
-                onClick={() => setNewChatOpen((v) => !v)}
-                className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
-              >
-                New
-              </button>
-              <label className="flex min-w-0 flex-1 flex-col text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Thread
-                <select
-                  value={chatId}
-                  onChange={(e) => setChatId(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 shadow-sm dark:border-zinc-600 dark:bg-zinc-950 dark:text-white"
-                >
-                  <option value="">Select conversation…</option>
-                  {(chatsQ.data ?? []).map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.contactId?.name || c.contactId?.phone || c._id.slice(-6)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            {newChatOpen ? (
-              <div className="relative z-10 border-b border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900 md:hidden">
-                <input
-                  value={contactSearch}
-                  onChange={(e) => setContactSearch(e.target.value)}
-                  placeholder="Search contact…"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                />
-                <div className="mt-2 max-h-40 overflow-y-auto">
-                  {(contactsQ.data?.data ?? []).map((c) => (
-                    <button
-                      key={c._id}
-                      type="button"
-                      disabled={startChat.isPending}
-                      onClick={() => void onStartChat(c._id)}
-                      className="block w-full rounded-lg px-2 py-2 text-left text-sm hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                    >
-                      {c.name || c.phone}
-                    </button>
-                  ))}
+              {typingHint ? (
+                <div className="self-start rounded-[10px] rounded-bl-[3px] border border-line bg-surface px-3 py-2 text-sm italic text-ink-4">
+                  Someone is typing…
                 </div>
+              ) : null}
+            </div>
+
+            {pickerFiles.length ? (
+              <div className="mx-4 mb-1 flex flex-wrap gap-1.5 rounded-control border border-dashed border-line bg-surface px-3 py-2 text-sm">
+                {pickerFiles.map((f) => (
+                  <span key={f.name + f.size} className="dc-badge">
+                    {f.name} ({Math.round(f.size / 1024)} KB) · preview only
+                  </span>
+                ))}
               </div>
             ) : null}
 
-            {!chatId ? (
-              <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-                <div className="rounded-2xl border border-zinc-200/80 bg-white/90 px-8 py-10 shadow-lg dark:border-zinc-700 dark:bg-zinc-900/90">
-                  <p className="text-base font-semibold text-zinc-900 dark:text-white">Pick a conversation</p>
-                  <p className="mt-2 max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
-                    Choose a contact on the left (or from the menu on mobile) to read and reply.
-                  </p>
+            <form
+              onSubmit={onSend}
+              className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-surface px-4 pb-3.5 pt-3 md:px-5"
+              style={{ paddingBottom: 'max(0.875rem, env(safe-area-inset-bottom))' }}
+            >
+              {sendErr ? <p className="dc-note dc-note-danger">{sendErr}</p> : null}
+
+              <div className="overflow-hidden rounded-card border border-line">
+                <div className="relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Type a message"
+                    rows={1}
+                    className="max-h-36 w-full resize-none border-0 bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-ink-4"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        void submitMessage();
+                      }
+                    }}
+                  />
+                  {emojiOpen ? (
+                    <div className="absolute bottom-[calc(100%+8px)] right-0 z-20 drop-shadow-xl">
+                      <EmojiPicker
+                        theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                        onEmojiClick={(ev) => setDraft((d) => d + ev.emoji)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-1.5 border-t border-line-soft bg-subtle px-2.5 py-2">
+                  <label className="dc-btn dc-btn-xs cursor-pointer">
+                    <IconPaperclip className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Attach</span>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        setPickerFiles(e.target.files ? Array.from(e.target.files) : []);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="dc-btn dc-btn-xs"
+                    onClick={() => setEmojiOpen((v) => !v)}
+                    aria-label="Emoji"
+                  >
+                    <IconSmile className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Emoji</span>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={sendM.isPending || !draft.trim()}
+                    className="dc-btn dc-btn-xs dc-btn-primary ml-auto px-4 font-medium"
+                  >
+                    {sendM.isPending ? '…' : 'Send'}
+                  </button>
                 </div>
               </div>
-            ) : (
-              <>
-                <div
-                  ref={scrollRef}
-                  className="relative z-10 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-6 md:py-5"
-                  style={{ scrollBehavior: 'smooth' }}
-                >
-                  <div ref={loadMoreRef} className="h-1 w-full shrink-0" />
-                  {isFetchingNextPage ? (
-                    <p className="text-center text-xs font-medium text-zinc-600 dark:text-zinc-400">Loading older…</p>
-                  ) : null}
-                  {msgQ.isLoading ? (
-                    <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">Loading messages…</p>
-                  ) : msgQ.isError ? (
-                    <p className="text-center text-sm text-red-600 dark:text-red-400">Could not load messages.</p>
-                  ) : flatMessages.length === 0 ? (
-                    <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">No messages yet — say hello.</p>
-                  ) : (
-                    flatMessages.map((m) => {
-                      const out = m.direction === 'outbound';
-                      return (
-                        <div key={m._id} className={`flex ${out ? 'justify-end' : 'justify-start'}`}>
-                          <div
-                            className={`max-w-[min(92%,28rem)] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed shadow-md ring-1 ring-black/5 dark:ring-white/10 ${
-                              out
-                                ? 'rounded-br-md bg-[#d9fdd3] text-zinc-900 dark:bg-emerald-900/55 dark:text-emerald-50'
-                                : 'rounded-bl-md bg-white text-zinc-900 dark:bg-[#202c33] dark:text-zinc-100'
-                            }`}
-                          >
-                            <div className="whitespace-pre-wrap break-words">{m.body}</div>
-                            <div
-                              className={`mt-1.5 flex items-center gap-1.5 text-[11px] font-normal normal-case tracking-normal ${out ? 'justify-end text-emerald-900/75 dark:text-emerald-200/80' : 'justify-start text-zinc-500 dark:text-zinc-400'}`}
-                            >
-                              <span className="tabular-nums opacity-90">{formatMsgTime(m.createdAt)}</span>
-                              {out ? <WaOutboundTicks status={m.status} statusDetail={m.statusDetail} /> : null}
-                            </div>
-                            {out && m.status === 'failed' && m.statusDetail ? (
-                              <p className="mt-1 text-[10px] leading-snug text-red-700/90 dark:text-red-300/90">
-                                {m.statusDetail}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                  {typingHint ? (
-                    <div className="flex justify-start">
-                      <div className="rounded-2xl rounded-bl-md bg-white/95 px-4 py-2.5 text-xs italic text-zinc-500 shadow-md ring-1 ring-black/5 dark:bg-zinc-800/95 dark:text-zinc-400 dark:ring-white/10">
-                        Someone is typing…
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
+            </form>
+          </>
+        )}
+      </section>
 
-                {pickerFiles.length ? (
-                  <div className="relative z-10 mx-3 mb-1 flex flex-wrap gap-2 rounded-xl border border-dashed border-zinc-400/50 bg-white/90 px-3 py-2.5 text-xs dark:border-zinc-500 dark:bg-zinc-900/80">
-                    {pickerFiles.map((f) => (
-                      <span
-                        key={f.name + f.size}
-                        className="rounded-lg bg-zinc-100 px-2.5 py-1 font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-                      >
-                        {f.name} ({Math.round(f.size / 1024)} KB) · preview only
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
+      {/* Contact details */}
+      {chatId && detailsOpen ? (
+        <aside className="hidden w-[252px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-line bg-surface p-4 lg:flex">
+          <div className="flex flex-col items-center gap-2">
+            <Avatar name={openName} className="h-[52px] w-[52px] text-lg" plain />
+            <span className="text-md font-semibold text-ink">{openName}</span>
+            <span className="dc-badge dc-badge-brand rounded-full px-2.5">WhatsApp</span>
+          </div>
 
-                <form
-                  onSubmit={onSend}
-                  className="relative z-10 shrink-0 border-t border-black/10 bg-white/95 px-3 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#1f2c33]/98 md:px-5 md:py-4"
-                  style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-                >
-                  <div className="mx-auto flex max-w-4xl items-end gap-2 rounded-2xl border border-zinc-200/90 bg-white p-2 shadow-inner dark:border-zinc-600/50 dark:bg-zinc-950/80 md:p-2.5">
-                    <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-transparent text-zinc-500 transition-colors hover:border-zinc-200 hover:bg-zinc-50 hover:text-emerald-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:hover:text-emerald-400">
-                      <span className="sr-only">Attach media</span>
-                      <IconPaperclip className="h-5 w-5" aria-hidden />
-                      <input
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          const files = e.target.files ? Array.from(e.target.files) : [];
-                          setPickerFiles(files);
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-ink-4">Phone</span>
+            <span className="text-base tabular-nums text-ink">{openPhone || '—'}</span>
+          </div>
 
-                    <div className="relative min-w-0 flex-1">
-                      <textarea
-                        ref={textareaRef}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        placeholder="Write a message…"
-                        rows={1}
-                        className="max-h-40 min-h-[48px] w-full resize-none border-0 bg-transparent px-2 py-3 text-[15px] text-zinc-900 outline-none ring-0 placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            void submitMessage();
-                          }
-                        }}
-                      />
-                      {emojiOpen ? (
-                        <div className="absolute bottom-[calc(100%+8px)] right-0 z-20 drop-shadow-xl">
-                          <EmojiPicker
-                            theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                            onEmojiClick={(ev) => {
-                              setDraft((d) => d + ev.emoji);
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-ink-4">Last message</span>
+            <span className="text-base text-ink">
+              {openChat?.lastMessageAt ? new Date(openChat.lastMessageAt).toLocaleString() : '—'}
+            </span>
+          </div>
 
-                    <button
-                      type="button"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-transparent text-zinc-500 transition-colors hover:border-zinc-200 hover:bg-zinc-50 hover:text-amber-600 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-900 dark:hover:text-amber-400"
-                      onClick={() => setEmojiOpen((v) => !v)}
-                      aria-label="Emoji"
-                    >
-                      <IconSmile className="h-5 w-5" />
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={sendM.isPending || !draft.trim()}
-                      className="h-11 shrink-0 rounded-xl bg-gradient-to-r from-[#00a884] to-emerald-600 px-5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition enabled:hover:from-emerald-500 enabled:hover:to-teal-600 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      {sendM.isPending ? '…' : 'Send'}
-                    </button>
-                  </div>
-                  {sendErr ? (
-                    <p className="mx-auto mt-2 max-w-4xl text-xs font-medium text-red-600 dark:text-red-400">{sendErr}</p>
-                  ) : null}
-                </form>
-              </>
-            )}
-          </section>
-        </div>
-        </>
-      )}
+          <div className="flex flex-col gap-1.5 border-t border-line-soft pt-3.5">
+            <span className="text-xs text-ink-4">Unread</span>
+            <span className="text-base tabular-nums text-ink">{openChat?.unreadCount ?? 0}</span>
+          </div>
+        </aside>
+      ) : null}
     </div>
   );
 }

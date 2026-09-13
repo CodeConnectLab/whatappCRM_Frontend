@@ -1,36 +1,25 @@
 import { Link } from 'react-router-dom';
 import type { WorkspaceSummary } from '../../types/api.ts';
+import { IconCheck } from '../Icons.tsx';
 
 type Props = {
   summary: WorkspaceSummary | undefined;
   compact?: boolean;
 };
 
-function Step({
-  done,
-  label,
-  detail,
-}: {
-  done: boolean;
-  label: string;
-  detail?: string;
-}) {
+function Step({ done, label, detail }: { done: boolean; label: string; detail?: string }) {
   return (
-    <li className="flex gap-3">
+    <li className="flex gap-2.5">
       <span
-        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-          done
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-            : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+          done ? 'bg-brand text-white' : 'border border-line bg-surface text-ink-4'
         }`}
       >
-        {done ? '✓' : '·'}
+        {done ? <IconCheck className="h-2.5 w-2.5" /> : <span className="h-1 w-1 rounded-full bg-current" />}
       </span>
       <div className="min-w-0">
-        <p className={`text-sm ${done ? 'text-zinc-700 dark:text-zinc-300' : 'font-medium text-zinc-900 dark:text-white'}`}>
-          {label}
-        </p>
-        {detail ? <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{detail}</p> : null}
+        <p className={`text-base ${done ? 'text-ink-2' : 'font-medium text-ink'}`}>{label}</p>
+        {detail ? <p className="mt-0.5 text-sm text-ink-3">{detail}</p> : null}
       </div>
     </li>
   );
@@ -59,37 +48,27 @@ export function MetaSetupStatus({ summary, compact }: Props) {
   const allDone = summary.metaReadyForCampaigns;
 
   if (compact && allDone) {
-    return (
-      <p className="text-sm text-emerald-700 dark:text-emerald-400">
-        Meta WhatsApp is ready for campaigns and inbound messages.
-      </p>
-    );
+    return <p className="text-base text-brand-ink">Meta WhatsApp is ready for campaigns and inbound messages.</p>;
   }
 
   return (
     <div
-      className={`rounded-xl border px-4 py-3 ${
-        allDone
-          ? 'border-emerald-200/90 bg-emerald-50/80 dark:border-emerald-900/50 dark:bg-emerald-950/30'
-          : 'border-amber-200/90 bg-amber-50/80 dark:border-amber-900/50 dark:bg-amber-950/30'
+      className={`rounded-card border px-4 py-3 ${
+        allDone ? 'border-brand-line bg-brand-soft' : 'border-warn-line bg-warn-soft'
       }`}
     >
-      <p
-        className={`text-sm font-medium ${
-          allDone ? 'text-emerald-900 dark:text-emerald-200' : 'text-amber-950 dark:text-amber-100'
-        }`}
-      >
-        {allDone ? 'Meta WhatsApp ready' : 'Setup checklist'}
+      <p className={`text-base font-semibold ${allDone ? 'text-brand-ink' : 'text-warn'}`}>
+        {allDone ? 'Meta WhatsApp ready' : `Setup checklist — ${steps.filter((s) => s.done).length} of 3 done`}
       </p>
-      <ul className="mt-3 space-y-2.5">
+      <ul className="mt-3 flex flex-col gap-2.5">
         {steps.map((s) => (
           <Step key={s.label} done={s.done} label={s.label} detail={compact ? undefined : s.detail} />
         ))}
       </ul>
       {!allDone && !compact ? (
-        <p className="mt-3 text-xs text-amber-900/80 dark:text-amber-200/80">
+        <p className="mt-3 text-sm text-warn/85">
           Finish the steps above in{' '}
-          <Link to="/settings" className="font-semibold underline">
+          <Link to="/settings" className="font-medium underline underline-offset-2">
             Settings
           </Link>{' '}
           before starting campaigns.

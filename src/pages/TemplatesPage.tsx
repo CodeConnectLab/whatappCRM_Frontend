@@ -4,7 +4,13 @@ import { useAuthStore } from '../store/authStore.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
 import { WhatsAppMessagePreview } from '../components/WhatsAppMessagePreview.tsx';
-import { WorkspaceAlertError, WorkspaceCard, WorkspaceIntro } from '../components/workspace/WorkspaceSurface.tsx';
+import {
+  CardNote,
+  PageHeader,
+  WorkspaceAlertError,
+  WorkspaceCard,
+} from '../components/workspace/WorkspaceSurface.tsx';
+import { IconClose, IconPlus } from '../components/Icons.tsx';
 import {
   DEFAULT_PREVIEW_SAMPLE,
   TEMPLATE_PLACEHOLDERS,
@@ -20,13 +26,13 @@ const CATEGORIES: { value: TemplateCategory; label: string; hint: string }[] = [
 ];
 
 const STATUS_STYLES: Record<TemplateStatus, string> = {
-  local: 'bg-zinc-200/80 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400',
-  PENDING: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300',
-  APPROVED: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
-  REJECTED: 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300',
-  PAUSED: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300',
-  DISABLED: 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300',
-  IN_APPEAL: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300',
+  local: 'dc-badge',
+  PENDING: 'dc-badge dc-badge-warn',
+  APPROVED: 'dc-badge dc-badge-brand',
+  REJECTED: 'dc-badge dc-badge-danger',
+  PAUSED: 'dc-badge dc-badge-warn',
+  DISABLED: 'dc-badge dc-badge-danger',
+  IN_APPEAL: 'dc-badge dc-badge-accent',
 };
 
 const STATUS_LABELS: Record<TemplateStatus, string> = {
@@ -41,11 +47,7 @@ const STATUS_LABELS: Record<TemplateStatus, string> = {
 
 function StatusBadge({ status }: { status?: TemplateStatus }) {
   const s = status ?? 'local';
-  return (
-    <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ${STATUS_STYLES[s]}`}>
-      {STATUS_LABELS[s]}
-    </span>
-  );
+  return <span className={STATUS_STYLES[s]}>{STATUS_LABELS[s]}</span>;
 }
 
 export function TemplatesPage() {
@@ -54,6 +56,8 @@ export function TemplatesPage() {
   const q = useTemplatesQuery();
   const { create, remove, submit, sync } = useTemplateMutations();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const [composerOpen, setComposerOpen] = useState(false);
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
   const [language, setLanguage] = useState('en');
@@ -84,6 +88,7 @@ export function TemplatesPage() {
       setName('');
       setBody('');
       setImageUrl('');
+      setComposerOpen(false);
     } catch (er) {
       setErr(apiErrorMessage(er));
     }
@@ -118,41 +123,69 @@ export function TemplatesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 pb-4">
+    <div className="flex flex-col gap-[18px]">
       <NeedsCompanyBanner />
 
-      <WorkspaceIntro
-        kicker="Messaging"
+      <PageHeader
         title="Templates"
-        description="Draft content your campaigns can reuse. Use placeholders for per-contact fields, add an optional public image URL for rich sends, and preview how the bubble will look."
+        description="Reusable message drafts. WhatsApp needs Meta approval before a template can be sent."
+        actions={
+          canManage ? (
+            <>
+              <button type="button" className="dc-btn" onClick={() => void onSync()} disabled={sync.isPending}>
+                {sync.isPending ? 'Refreshing…' : 'Refresh from Meta'}
+              </button>
+              <button
+                type="button"
+                className="dc-btn dc-btn-primary"
+                onClick={() => setComposerOpen((v) => !v)}
+                disabled={!companyId}
+              >
+                {composerOpen ? <IconClose className="h-3.5 w-3.5" /> : <IconPlus className="h-3.5 w-3.5" />}
+                {composerOpen ? 'Close' : 'New template'}
+              </button>
+            </>
+          ) : null
+        }
       />
 
-      {canManage ? (
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      {err ? <WorkspaceAlertError>{err}</WorkspaceAlertError> : null}
+
+      {!canManage ? (
+        <WorkspaceCard>
+          <CardNote>
+            Only company admins can create or delete templates. You can still use approved templates in campaigns.
+          </CardNote>
+        </WorkspaceCard>
+      ) : null}
+
+      {/* ---------------------------------------------------------- composer */}
+      {canManage && composerOpen ? (
+        <div className="grid items-start gap-4 lg:grid-cols-[1.4fr_1fr]">
           <WorkspaceCard title="New template">
-            <form className="space-y-4" onSubmit={onCreate}>
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">Name</span>
+            <form className="flex flex-col gap-3.5" onSubmit={onCreate}>
+              <label className="dc-label">
+                <span className="dc-label-text">Name</span>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 text-zinc-900 outline-none transition focus:border-emerald-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="dc-input"
                   required
                   placeholder="e.g. Welcome / Promo week"
                 />
               </label>
 
-              <div>
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Placeholders</span>
-                <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                  Click to insert at the cursor. Data comes from each contact when a campaign runs.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
+              <div className="flex flex-col gap-1.5">
+                <span className="dc-label-text">Placeholders</span>
+                <span className="text-sm text-ink-4">
+                  Click to insert at the cursor. Values come from each contact when a campaign runs.
+                </span>
+                <div className="flex flex-wrap gap-1.5">
                   {TEMPLATE_PLACEHOLDERS.map((p) => (
                     <button
                       key={p.key}
                       type="button"
-                      className="rounded-lg border border-amber-200/80 bg-amber-50 px-2.5 py-1 font-mono text-xs font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/70"
+                      className="rounded-control border border-warn-line bg-warn-soft px-2 py-1 font-mono text-xs font-medium text-warn transition-colors hover:brightness-95"
                       onClick={() => addPlaceholder(p.token)}
                       title={p.hint}
                     >
@@ -162,235 +195,199 @@ export function TemplatesPage() {
                 </div>
               </div>
 
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">Message body</span>
+              <label className="dc-label">
+                <span className="dc-label-text">Message body</span>
                 <textarea
                   ref={bodyRef}
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   rows={6}
-                  className="mt-1.5 w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 font-[15px] text-zinc-900 outline-none transition focus:border-emerald-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="dc-textarea"
                   required
                   placeholder="Hi {{name}}, thanks for joining us!"
                 />
               </label>
 
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                  Image URL <span className="font-normal text-zinc-500">(optional)</span>
+              <label className="dc-label">
+                <span className="dc-label-text">
+                  Image URL <span className="font-normal text-ink-4">(optional)</span>
                 </span>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  Public HTTPS link — shown in preview and attached when campaigns send.
-                </p>
                 <input
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   type="url"
                   placeholder="https://cdn.example.com/promo.jpg"
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 text-zinc-900 outline-none transition focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="dc-input"
                 />
+                <span className="text-sm text-ink-4">
+                  Public HTTPS link — shown in preview and attached when campaigns send.
+                </span>
               </label>
 
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">Language code</span>
-                <input
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="mt-1.5 w-full max-w-xs rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                  placeholder="en"
-                />
-              </label>
+              <div className="grid gap-3.5 sm:grid-cols-2">
+                <label className="dc-label">
+                  <span className="dc-label-text">Language code</span>
+                  <input
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="dc-input"
+                    placeholder="en"
+                  />
+                </label>
+                <label className="dc-label">
+                  <span className="dc-label-text">Category</span>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as TemplateCategory)}
+                    className="dc-select"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label} — {c.hint}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="text-sm text-ink-4">
+                Meta rejects templates filed under the wrong category — promotional content must be Marketing.
+              </p>
 
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">Category</span>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  Meta rejects templates filed under the wrong category — promotional content must be Marketing.
-                </p>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as TemplateCategory)}
-                  className="mt-1.5 w-full max-w-xs rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+              <div className="flex gap-2 border-t border-line-soft pt-3.5">
+                <button type="button" className="dc-btn" onClick={() => setComposerOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={create.isPending || !companyId}
+                  className="dc-btn dc-btn-primary ml-auto px-5"
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label} — {c.hint}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <button
-                type="submit"
-                disabled={create.isPending || !companyId}
-                className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 disabled:opacity-50 sm:w-auto sm:px-8"
-              >
-                {create.isPending ? 'Saving…' : 'Save template'}
-              </button>
+                  {create.isPending ? 'Saving…' : 'Save template'}
+                </button>
+              </div>
             </form>
           </WorkspaceCard>
 
-          <div className="space-y-4 lg:sticky lg:top-4">
-            <WorkspaceCard title="Live preview">
-              <div className="mb-4 flex flex-wrap gap-2 rounded-xl bg-zinc-50 p-2 dark:bg-zinc-800/50">
+          <WorkspaceCard title="Live preview" className="lg:sticky lg:top-4">
+            <div className="mb-3.5 flex gap-1 rounded-control bg-muted p-1">
+              {(
+                [
+                  ['tokens', 'Placeholders visible'],
+                  ['filled', 'Sample contact'],
+                ] as const
+              ).map(([mode, label]) => (
                 <button
+                  key={mode}
                   type="button"
-                  onClick={() => setPreviewMode('tokens')}
-                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition sm:flex-none ${
-                    previewMode === 'tokens'
-                      ? 'bg-white text-emerald-800 shadow-sm dark:bg-zinc-900 dark:text-emerald-300'
-                      : 'text-zinc-600 dark:text-zinc-400'
+                  onClick={() => setPreviewMode(mode)}
+                  className={`h-7 flex-1 rounded-[5px] px-3 text-sm transition-colors ${
+                    previewMode === mode ? 'bg-surface font-semibold text-ink shadow-card' : 'text-ink-3'
                   }`}
                 >
-                  Placeholders visible
+                  {label}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode('filled')}
-                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition sm:flex-none ${
-                    previewMode === 'filled'
-                      ? 'bg-white text-emerald-800 shadow-sm dark:bg-zinc-900 dark:text-emerald-300'
-                      : 'text-zinc-600 dark:text-zinc-400'
-                  }`}
-                >
-                  Sample contact
-                </button>
+              ))}
+            </div>
+
+            {previewMode === 'filled' ? (
+              <div className="mb-3.5 grid gap-2 rounded-control border border-line bg-muted p-3">
+                {(
+                  [
+                    ['name', sample.name, (v: string) => setSample((s) => ({ ...s, name: v }))],
+                    ['phone', sample.phone, (v: string) => setSample((s) => ({ ...s, phone: v }))],
+                    ['email', sample.email, (v: string) => setSample((s) => ({ ...s, email: v }))],
+                  ] as const
+                ).map(([key, val, onChange]) => (
+                  <label key={key} className="flex flex-col gap-1">
+                    <span className="text-2xs uppercase tracking-[0.06em] text-ink-4">{key}</span>
+                    <input
+                      value={val}
+                      onChange={(e) => onChange(e.target.value)}
+                      className="dc-input h-8 text-sm"
+                    />
+                  </label>
+                ))}
               </div>
-              {previewMode === 'filled' ? (
-                <div className="mb-4 grid gap-2 rounded-xl border border-zinc-200/80 bg-zinc-50/80 p-3 text-xs dark:border-zinc-700 dark:bg-zinc-900/40">
-                  {(
-                    [
-                      ['name', sample.name, (v: string) => setSample((s) => ({ ...s, name: v }))],
-                      ['phone', sample.phone, (v: string) => setSample((s) => ({ ...s, phone: v }))],
-                      ['email', sample.email, (v: string) => setSample((s) => ({ ...s, email: v }))],
-                    ] as const
-                  ).map(([key, val, onChange]) => (
-                    <label key={key} className="block">
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">{key}</span>
-                      <input
-                        value={val}
-                        onChange={(e) => onChange(e.target.value)}
-                        className="mt-0.5 w-full rounded-lg border border-zinc-200 px-2 py-1 dark:border-zinc-600 dark:bg-zinc-950"
-                      />
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-              <WhatsAppMessagePreview
-                body={body}
-                imageUrl={imageUrl}
-                showRawPlaceholders={previewMode === 'tokens'}
-                sample={sample}
-              />
-            </WorkspaceCard>
-          </div>
+            ) : null}
+
+            <WhatsAppMessagePreview
+              body={body}
+              imageUrl={imageUrl}
+              showRawPlaceholders={previewMode === 'tokens'}
+              sample={sample}
+            />
+          </WorkspaceCard>
         </div>
-      ) : (
-        <WorkspaceCard>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Only company admins can create or delete templates. You can still use them in campaigns if assigned.
-          </p>
-        </WorkspaceCard>
-      )}
+      ) : null}
 
-      {err ? <WorkspaceAlertError>{err}</WorkspaceAlertError> : null}
-
+      {/* ----------------------------------------------------------- library */}
       {!companyId ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace.</p>
+        <WorkspaceCard>
+          <CardNote>Select a workspace.</CardNote>
+        </WorkspaceCard>
       ) : q.isLoading ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+        <WorkspaceCard>
+          <CardNote>Loading…</CardNote>
+        </WorkspaceCard>
       ) : q.isError ? (
         <WorkspaceAlertError>Failed to load templates.</WorkspaceAlertError>
-      ) : sortedTemplates.length === 0 ? (
-        <WorkspaceCard title="Library">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">No templates yet. Create one on the left.</p>
+      ) : !sortedTemplates.length ? (
+        <WorkspaceCard>
+          <CardNote>No templates yet. Create one with “New template”.</CardNote>
         </WorkspaceCard>
       ) : (
-        <WorkspaceCard title="Saved templates">
-          {canManage ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200/80 bg-zinc-50/60 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900/40">
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                Campaigns can only send <strong>approved</strong> templates. Submit a template, then refresh to see
-                Meta&rsquo;s verdict — approval takes 15 minutes to 24 hours.
-              </p>
-              <button
-                type="button"
-                onClick={() => void onSync()}
-                disabled={sync.isPending}
-                className="shrink-0 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:bg-white disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-              >
-                {sync.isPending ? 'Refreshing…' : 'Refresh status from Meta'}
-              </button>
-            </div>
-          ) : null}
-          <ul className="space-y-4">
-            {sortedTemplates.map((t) => (
-              <li
-                key={t._id}
-                className="flex flex-col gap-4 rounded-xl border border-zinc-100 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-950/40 md:flex-row md:items-stretch"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-zinc-900 dark:text-white">{t.name}</span>
-                      {t.language ? (
-                        <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                          {t.language}
-                        </span>
-                      ) : null}
-                      {t.category ? (
-                        <span className="rounded-md bg-zinc-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                          {t.category}
-                        </span>
-                      ) : null}
-                      <StatusBadge status={t.status} />
-                    </div>
-                    {canManage ? (
-                      <div className="flex shrink-0 items-center gap-3">
-                        {t.status !== 'APPROVED' && t.status !== 'PENDING' ? (
-                          <button
-                            type="button"
-                            className="text-xs font-semibold text-emerald-700 hover:underline disabled:opacity-50 dark:text-emerald-400"
-                            disabled={submit.isPending}
-                            onClick={() => void onSubmitForApproval(t._id)}
-                          >
-                            {submit.isPending ? 'Submitting…' : 'Submit for approval'}
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
-                          disabled={remove.isPending}
-                          onClick={() => void remove.mutateAsync(t._id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                  {t.status === 'REJECTED' && t.rejectedReason ? (
-                    <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800 dark:bg-red-950/40 dark:text-red-300">
-                      Meta rejected this: {t.rejectedReason}
-                    </p>
+        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+          {sortedTemplates.map((t) => (
+            <article key={t._id} className="flex min-h-[170px] flex-col gap-2.5 rounded-card border border-line bg-surface p-4">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="dc-badge dc-badge-brand">WhatsApp</span>
+                <StatusBadge status={t.status} />
+                {t.category ? <span className="ml-auto text-xs text-ink-4">{t.category}</span> : null}
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-md font-semibold text-ink">
+                  {t.name}
+                  {t.language ? <span className="ml-2 text-xs font-normal text-ink-4">{t.language}</span> : null}
+                </span>
+                <p className="line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-ink-3">{t.body}</p>
+              </div>
+
+              {t.status === 'REJECTED' && t.rejectedReason ? (
+                <p className="rounded-control bg-danger-soft px-2.5 py-1.5 text-sm text-danger">
+                  Meta rejected this: {t.rejectedReason}
+                </p>
+              ) : null}
+
+              {t.imageUrl ? (
+                <p className="truncate font-mono text-2xs text-ink-4">Image: {t.imageUrl}</p>
+              ) : null}
+
+              {canManage ? (
+                <div className="mt-auto flex items-center gap-2 border-t border-line-soft pt-2.5">
+                  {t.status !== 'APPROVED' && t.status !== 'PENDING' ? (
+                    <button
+                      type="button"
+                      className="dc-btn dc-btn-xs"
+                      disabled={submit.isPending}
+                      onClick={() => void onSubmitForApproval(t._id)}
+                    >
+                      {submit.isPending ? 'Submitting…' : 'Submit for approval'}
+                    </button>
                   ) : null}
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">{t.body}</p>
-                  {t.imageUrl ? (
-                    <p className="mt-2 truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
-                      Image: {t.imageUrl}
-                    </p>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="dc-btn dc-btn-xs dc-btn-danger ml-auto"
+                    disabled={remove.isPending}
+                    onClick={() => void remove.mutateAsync(t._id)}
+                  >
+                    Delete
+                  </button>
                 </div>
-                <div className="w-full shrink-0 md:w-[220px]">
-                  <WhatsAppMessagePreview
-                    body={t.body}
-                    imageUrl={t.imageUrl}
-                    showRawPlaceholders={false}
-                    caption="Quick look"
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </WorkspaceCard>
+              ) : null}
+            </article>
+          ))}
+        </div>
       )}
     </div>
   );

@@ -3,8 +3,13 @@ import { useInviteMemberMutation, useTeamQuery } from '../hooks/apiHooks.ts';
 import { useAuthStore } from '../store/authStore.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
-import { WorkspaceAlertError, WorkspaceCard, WorkspaceIntro } from '../components/workspace/WorkspaceSurface.tsx';
-import { WORKSPACE_INPUT_CLASS, WORKSPACE_PRIMARY_BTN_CLASS } from '../lib/workspaceUi.ts';
+import {
+  Avatar,
+  CardNote,
+  PageHeader,
+  WorkspaceAlertError,
+  WorkspaceCard,
+} from '../components/workspace/WorkspaceSurface.tsx';
 
 export function TeamPage() {
   const companyId = useAuthStore((s) => s.companyId);
@@ -14,6 +19,9 @@ export function TeamPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'company_admin' | 'agent'>('agent');
   const [err, setErr] = useState<string | null>(null);
+
+  const canManage = workspaceRole === 'company_admin';
+  const members = q.data ?? [];
 
   async function onInvite(e: FormEvent) {
     e.preventDefault();
@@ -27,82 +35,106 @@ export function TeamPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 pb-4">
+    <div className="flex flex-col gap-[18px]">
       <NeedsCompanyBanner />
-      <WorkspaceIntro
-        kicker="Workspace"
+
+      <PageHeader
         title="Team"
-        description="Everyone listed here can work inside this company. Admins can invite registered users and assign roles."
+        description="Everyone listed here can work inside this company. Admins invite registered users and assign roles."
       />
 
-      {workspaceRole === 'company_admin' ? (
+      {err ? <WorkspaceAlertError>{err}</WorkspaceAlertError> : null}
+
+      {canManage ? (
         <WorkspaceCard title="Invite teammate">
-          <form onSubmit={onInvite} className="flex flex-col gap-4 md:flex-row md:items-end">
-            <label className="block flex-1 text-sm">
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">Email (must be registered)</span>
+          <form onSubmit={onInvite} className="flex flex-col gap-3.5 md:flex-row md:items-end">
+            <label className="dc-label flex-1">
+              <span className="dc-label-text">Email (must be registered)</span>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`${WORKSPACE_INPUT_CLASS} mt-1.5`}
+                className="dc-input"
+                placeholder="teammate@company.com"
                 required
               />
             </label>
-            <label className="block text-sm md:w-44">
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">Role</span>
+            <label className="dc-label md:w-48">
+              <span className="dc-label-text">Role</span>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as 'company_admin' | 'agent')}
-                className={`${WORKSPACE_INPUT_CLASS} mt-1.5`}
+                className="dc-select"
               >
                 <option value="agent">Agent</option>
                 <option value="company_admin">Company admin</option>
               </select>
             </label>
-            <button type="submit" disabled={invite.isPending || !companyId} className={WORKSPACE_PRIMARY_BTN_CLASS}>
+            <button
+              type="submit"
+              disabled={invite.isPending || !companyId}
+              className="dc-btn dc-btn-primary shrink-0"
+            >
               {invite.isPending ? 'Inviting…' : 'Invite'}
             </button>
           </form>
         </WorkspaceCard>
       ) : (
         <WorkspaceCard>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">Only company admins can invite teammates.</p>
+          <CardNote>Only company admins can invite teammates.</CardNote>
         </WorkspaceCard>
       )}
 
-      {err ? <WorkspaceAlertError>{err}</WorkspaceAlertError> : null}
-
-      {!companyId ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace to view the team.</p>
-      ) : q.isLoading ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
-      ) : q.isError ? (
-        <WorkspaceAlertError>Failed to load team.</WorkspaceAlertError>
-      ) : q.data?.length === 0 ? (
-        <WorkspaceCard title="Members">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">No members yet.</p>
-        </WorkspaceCard>
-      ) : (
-        <WorkspaceCard title="Members">
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {(q.data ?? []).map((m) => (
-              <li
-                key={m._id}
-                className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0"
-              >
-                <div>
-                  <div className="font-medium text-zinc-900 dark:text-white">
-                    {m.userId?.name ?? '—'} <span className="font-normal text-zinc-500">({m.userId?.email})</span>
-                  </div>
-                  <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    {m.role}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </WorkspaceCard>
-      )}
+      <WorkspaceCard title="Members" action={<span className="text-sm text-ink-4">{members.length} total</span>} flush>
+        {!companyId ? (
+          <div className="p-4">
+            <CardNote>Select a workspace to view the team.</CardNote>
+          </div>
+        ) : q.isLoading ? (
+          <div className="p-4">
+            <CardNote>Loading…</CardNote>
+          </div>
+        ) : q.isError ? (
+          <div className="p-4">
+            <CardNote>Failed to load team.</CardNote>
+          </div>
+        ) : !members.length ? (
+          <div className="p-4">
+            <CardNote>No members yet.</CardNote>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="dc-table dc-table-hover min-w-[520px]">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="pl-4">Member</th>
+                  <th className="pr-4">Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr key={m._id}>
+                    <td className="pl-4">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={m.userId?.name ?? m.userId?.email} className="h-7 w-7 text-2xs" plain />
+                        <div className="flex min-w-0 flex-col gap-px">
+                          <span className="truncate font-medium">{m.userId?.name ?? '—'}</span>
+                          <span className="truncate text-xs text-ink-4">{m.userId?.email}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="pr-4">
+                      <span className={`dc-badge ${m.role === 'company_admin' ? 'dc-badge-brand' : ''}`}>
+                        {m.role === 'company_admin' ? 'Company admin' : 'Agent'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </WorkspaceCard>
     </div>
   );
 }

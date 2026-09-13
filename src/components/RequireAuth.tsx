@@ -7,7 +7,7 @@ export function RequireAuth() {
   if (!token) return <Navigate to="/login" replace />;
   if (!sessionReady) {
     return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-zinc-50 text-sm text-zinc-500 dark:bg-zinc-950">
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center text-base text-ink-3">
         Preparing workspace…
       </div>
     );

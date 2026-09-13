@@ -15,15 +15,22 @@ import { MetaSetupStatus } from '../components/settings/MetaSetupStatus.tsx';
 import { TwilioSettingsPanels } from '../components/settings/TwilioSettingsPanels.tsx';
 import { SHOW_TWILIO_UI } from '../config/features.ts';
 import { visibleWhatsappSenders } from '../lib/visibleSenders.ts';
-import { WorkspaceCard, WorkspaceIntro } from '../components/workspace/WorkspaceSurface.tsx';
+import { CardNote, PageHeader, WorkspaceCard } from '../components/workspace/WorkspaceSurface.tsx';
 
-const field =
-  'w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-emerald-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-950 dark:text-white';
+type SettingsTab = 'channel' | 'senders' | 'company';
+
+const TABS: { key: SettingsTab; name: string; hint: string }[] = [
+  { key: 'channel', name: 'WhatsApp channel', hint: 'Meta' },
+  { key: 'senders', name: 'Senders', hint: 'Numbers' },
+  { key: 'company', name: 'Company', hint: 'Profile' },
+];
 
 export function SettingsPage() {
   const companyId = useAuthStore((s) => s.companyId);
   const companyName = useAuthStore((s) => s.companyName);
   const workspaceRole = useAuthStore((s) => s.workspaceRole);
+
+  const [tab, setTab] = useState<SettingsTab>('channel');
   const [cName, setCName] = useState(companyName ?? '');
   const [preferredProvider, setPreferredProvider] = useState<'twilio' | 'meta'>('meta');
 
@@ -53,9 +60,7 @@ export function SettingsPage() {
   const updateCompany = useUpdateCompanySettingsMutation();
 
   useEffect(() => {
-    if (summary.data?.whatsappProvider) {
-      setPreferredProvider(summary.data.whatsappProvider);
-    }
+    if (summary.data?.whatsappProvider) setPreferredProvider(summary.data.whatsappProvider);
   }, [summary.data?.whatsappProvider]);
 
   useEffect(() => {
@@ -63,6 +68,17 @@ export function SettingsPage() {
     if (metaCfg.data?.appId) setMetaAppId(metaCfg.data.appId);
     if (metaCfg.data?.webhookVerifyToken) setMetaVerifyTokenEdit(metaCfg.data.webhookVerifyToken);
   }, [metaCfg.data?.wabaId, metaCfg.data?.appId, metaCfg.data?.webhookVerifyToken]);
+
+  useEffect(() => {
+    const metaSender = (numbers.data ?? []).find((n) => n.provider === 'meta');
+    if (!metaSender) return;
+    setMetaPhoneNumberId(metaSender.metaPhoneNumberId ?? '');
+    setMetaDisplayPhone(metaSender.phoneNumber);
+    setMetaSenderLabel(metaSender.friendlyName ?? '');
+    setMetaIsDefault(metaSender.isDefault ?? true);
+  }, [numbers.data]);
+
+  const canManage = workspaceRole === 'company_admin';
 
   async function copyText(label: string, text: string) {
     try {
@@ -73,8 +89,6 @@ export function SettingsPage() {
       setErr('Could not copy to clipboard');
     }
   }
-
-  const canManage = workspaceRole === 'company_admin';
 
   async function onCompany(e: FormEvent) {
     e.preventDefault();
@@ -93,13 +107,11 @@ export function SettingsPage() {
     e.preventDefault();
     setErr(null);
     setMetaSaveOk(null);
-    const needsToken = !metaCfg.data?.accessTokenConfigured;
-    const needsSecret = !metaCfg.data?.appSecretConfigured;
-    if (needsToken && !metaToken.trim()) {
+    if (!metaCfg.data?.accessTokenConfigured && !metaToken.trim()) {
       setErr('Access token is required on first setup');
       return;
     }
-    if (needsSecret && !metaAppSecret.trim()) {
+    if (!metaCfg.data?.appSecretConfigured && !metaAppSecret.trim()) {
       setErr('App secret is required on first setup');
       return;
     }
@@ -132,15 +144,6 @@ export function SettingsPage() {
     }
   }
 
-  useEffect(() => {
-    const metaSender = (numbers.data ?? []).find((n) => n.provider === 'meta');
-    if (!metaSender) return;
-    setMetaPhoneNumberId(metaSender.metaPhoneNumberId ?? '');
-    setMetaDisplayPhone(metaSender.phoneNumber);
-    setMetaSenderLabel(metaSender.friendlyName ?? '');
-    setMetaIsDefault(metaSender.isDefault ?? true);
-  }, [numbers.data]);
-
   async function onMetaNumber(e: FormEvent) {
     e.preventDefault();
     setErr(null);
@@ -159,330 +162,357 @@ export function SettingsPage() {
     }
   }
 
-  const primaryBtn =
-    'rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 dark:shadow-emerald-900/30';
-
-  const secondaryBtn =
-    'rounded-xl border border-blue-200/90 bg-blue-50/80 px-4 py-2.5 text-sm font-semibold text-blue-900 transition hover:bg-blue-100 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-100 dark:hover:bg-blue-950/70 disabled:opacity-50';
-
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="flex flex-col gap-[18px]">
       <NeedsCompanyBanner />
 
-      <WorkspaceIntro
-        kicker="Workspace"
-        title="Settings"
-        description="Connect Meta WhatsApp Cloud API for this workspace (credentials encrypted on the server). Campaigns and live chats use the sender you configure below."
-      />
+      <PageHeader title="Settings" description="Workspace configuration, channels and access." />
 
-      {err ? (
-        <div className="rounded-xl border border-red-200/90 bg-red-50/90 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/35 dark:text-red-200">
-          {err}
-        </div>
-      ) : null}
+      {err ? <div className="dc-note dc-note-danger">{err}</div> : null}
+      {metaSaveOk ? <div className="dc-note dc-note-brand">{metaSaveOk}</div> : null}
 
-      {metaSaveOk ? (
-        <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/90 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/35 dark:text-emerald-200">
-          {metaSaveOk}
-        </div>
-      ) : null}
-
-      {canManage ? <MetaSetupStatus summary={summary.data} /> : null}
-
-      {canManage ? (
-        <WorkspaceCard title="Company profile">
-          <form onSubmit={onCompany} className="space-y-4">
-            <div>
-              <label htmlFor="settings-company-name" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                Display name
-              </label>
-              <input
-                id="settings-company-name"
-                value={cName}
-                onChange={(e) => setCName(e.target.value)}
-                className={`${field} mt-1.5`}
-              />
-            </div>
-            {SHOW_TWILIO_UI ? (
-              <div>
-                <label htmlFor="settings-provider" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  Default messaging provider (hint for new setup)
-                </label>
-                <select
-                  id="settings-provider"
-                  value={preferredProvider}
-                  onChange={(e) => setPreferredProvider(e.target.value as 'twilio' | 'meta')}
-                  className={`${field} mt-1.5`}
-                >
-                  <option value="twilio">Twilio</option>
-                  <option value="meta">Meta (WhatsApp Cloud API)</option>
-                </select>
-                <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                  Actual sends use the <strong>sender</strong> you choose on each campaign or chat.
-                </p>
-              </div>
-            ) : null}
-            <button type="submit" disabled={updateCompany.isPending || !companyId} className={primaryBtn}>
-              {updateCompany.isPending ? 'Saving…' : 'Save company'}
+      <div className="grid items-start gap-4 lg:grid-cols-[220px_1fr]">
+        {/* Side tab rail ------------------------------------------------- */}
+        <aside className="flex flex-row gap-px overflow-x-auto rounded-card border border-line bg-surface p-1.5 lg:flex-col">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={`flex h-[34px] shrink-0 items-center gap-2 rounded-control px-2.5 text-left text-base transition-colors ${
+                tab === t.key ? 'bg-brand-soft font-semibold text-brand-ink' : 'text-ink-2 hover:bg-line-soft'
+              }`}
+            >
+              <span className="truncate">{t.name}</span>
+              <span className="ml-auto hidden text-xs text-ink-4 lg:inline">{t.hint}</span>
             </button>
-          </form>
-        </WorkspaceCard>
-      ) : (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Company name changes are limited to admins.</p>
-      )}
+          ))}
+        </aside>
 
-      {canManage ? (
-        <>
-          {SHOW_TWILIO_UI ? <TwilioSettingsPanels onError={setErr} /> : null}
+        <div className="flex min-w-0 flex-col gap-3.5">
+          {/* ------------------------------------------------------ channel */}
+          {tab === 'channel' ? (
+            canManage ? (
+              <>
+                <MetaSetupStatus summary={summary.data} />
 
-          <WorkspaceCard title="Meta WhatsApp Cloud API (this workspace)">
-            <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              Each workspace uses its own Meta app. Set{' '}
-              <code className="rounded bg-zinc-100 px-1 text-[11px] dark:bg-zinc-800">PUBLIC_API_BASE_URL</code> on
-              the API (ngrok in dev) to generate your unique webhook URL below.
-            </p>
+                {SHOW_TWILIO_UI ? <TwilioSettingsPanels onError={setErr} /> : null}
 
-            <MetaWebhookStatusBanner config={metaCfg.data} />
+                <WorkspaceCard title="Meta WhatsApp Cloud API">
+                  <p className="text-sm leading-relaxed text-ink-3">
+                    Each workspace uses its own Meta app. Set{' '}
+                    <code className="rounded bg-muted px-1 font-mono text-xs">PUBLIC_API_BASE_URL</code> on the
+                    API (ngrok in dev) to generate your unique webhook URL below.
+                  </p>
 
-            {metaCfg.data?.webhookUrl ? (
-              <div className="mt-4 space-y-3 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-900 dark:text-blue-200">
-                    Webhook callback URL
+                  <div className="mt-3.5">
+                    <MetaWebhookStatusBanner config={metaCfg.data} />
                   </div>
-                  <code className="mt-1 block break-all font-mono text-[12px] text-blue-950 dark:text-blue-100">
-                    {metaCfg.data.webhookUrl}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => void copyText('Webhook URL', metaCfg.data!.webhookUrl!)}
-                    className="mt-2 text-xs font-semibold text-blue-800 underline dark:text-blue-300"
-                  >
-                    Copy URL
-                  </button>
-                </div>
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-900 dark:text-blue-200">
-                    Verify token
-                  </div>
-                  <code className="mt-1 block break-all font-mono text-[12px] text-blue-950 dark:text-blue-100">
-                    {metaCfg.data.webhookVerifyToken ?? metaVerifyTokenEdit}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void copyText(
-                        'Verify token',
-                        metaCfg.data?.webhookVerifyToken ?? metaVerifyTokenEdit,
-                      )
-                    }
-                    className="mt-2 text-xs font-semibold text-blue-800 underline dark:text-blue-300"
-                  >
-                    Copy verify token
-                  </button>
-                </div>
-                <p className="text-[11px] text-blue-900/80 dark:text-blue-200/80">
-                  Meta Developer, WhatsApp, Configuration: paste URL and verify token, subscribe to messages, then
-                  Verify and save.
-                </p>
-              </div>
+
+                  {metaCfg.data?.webhookUrl ? (
+                    <div className="mt-3.5 flex flex-col gap-3 rounded-card border border-accent-line bg-accent-soft p-4">
+                      <div>
+                        <div className="text-2xs font-semibold uppercase tracking-[0.06em] text-accent-ink">
+                          Webhook callback URL
+                        </div>
+                        <code className="mt-1 block break-all font-mono text-sm text-accent-ink">
+                          {metaCfg.data.webhookUrl}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => void copyText('Webhook URL', metaCfg.data!.webhookUrl!)}
+                          className="mt-1.5 text-sm font-medium text-accent-ink underline underline-offset-2"
+                        >
+                          Copy URL
+                        </button>
+                      </div>
+                      <div>
+                        <div className="text-2xs font-semibold uppercase tracking-[0.06em] text-accent-ink">
+                          Verify token
+                        </div>
+                        <code className="mt-1 block break-all font-mono text-sm text-accent-ink">
+                          {metaCfg.data.webhookVerifyToken ?? metaVerifyTokenEdit}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void copyText('Verify token', metaCfg.data?.webhookVerifyToken ?? metaVerifyTokenEdit)
+                          }
+                          className="mt-1.5 text-sm font-medium text-accent-ink underline underline-offset-2"
+                        >
+                          Copy verify token
+                        </button>
+                      </div>
+                      <p className="text-xs text-accent-ink/80">
+                        Meta Developer → WhatsApp → Configuration: paste URL and verify token, subscribe to
+                        messages, then Verify and save.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="dc-note dc-note-warn mt-3.5">
+                      Save credentials once to generate your webhook URL (needs PUBLIC_API_BASE_URL on the API).
+                    </p>
+                  )}
+
+                  <form onSubmit={onMetaConfig} className="mt-4 flex flex-col gap-3.5">
+                    <label className="dc-label">
+                      <span className="dc-label-text">
+                        Access token{' '}
+                        {metaCfg.data?.accessTokenConfigured ? (
+                          <span className="font-normal text-brand-ink">(saved)</span>
+                        ) : null}
+                      </span>
+                      <input
+                        type="password"
+                        value={metaToken}
+                        onChange={(e) => setMetaToken(e.target.value)}
+                        placeholder={metaCfg.data?.accessTokenConfigured ? 'Leave blank to keep existing' : 'EAAG…'}
+                        className="dc-input font-mono text-sm"
+                      />
+                    </label>
+
+                    <label className="dc-label">
+                      <span className="dc-label-text">
+                        App secret{' '}
+                        {metaCfg.data?.appSecretConfigured ? (
+                          <span className="font-normal text-brand-ink">(saved)</span>
+                        ) : null}
+                      </span>
+                      <input
+                        type="password"
+                        value={metaAppSecret}
+                        onChange={(e) => setMetaAppSecret(e.target.value)}
+                        placeholder={
+                          metaCfg.data?.appSecretConfigured ? 'Leave blank to keep existing' : 'App Settings → Basic'
+                        }
+                        className="dc-input font-mono text-sm"
+                      />
+                    </label>
+
+                    <label className="dc-label">
+                      <span className="dc-label-text">Webhook verify token</span>
+                      <input
+                        value={metaVerifyTokenEdit}
+                        onChange={(e) => setMetaVerifyTokenEdit(e.target.value)}
+                        placeholder="Auto-generated if empty"
+                        className="dc-input font-mono text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void onRegenerateVerifyToken()}
+                        disabled={upsertMetaCfg.isPending}
+                        className="dc-btn-link self-start"
+                      >
+                        Generate new verify token
+                      </button>
+                    </label>
+
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                      <label className="dc-label">
+                        <span className="dc-label-text">
+                          WhatsApp Business Account ID <span className="font-normal text-ink-4">(optional)</span>
+                        </span>
+                        <input
+                          value={metaWabaId}
+                          onChange={(e) => setMetaWabaId(e.target.value)}
+                          placeholder="76756565659623371"
+                          className="dc-input font-mono text-sm"
+                        />
+                      </label>
+                      <label className="dc-label">
+                        <span className="dc-label-text">
+                          App ID <span className="font-normal text-ink-4">(optional)</span>
+                        </span>
+                        <input
+                          value={metaAppId}
+                          onChange={(e) => setMetaAppId(e.target.value)}
+                          placeholder="1234567890123456"
+                          className="dc-input font-mono text-sm"
+                        />
+                      </label>
+                    </div>
+                    <p className="text-sm text-ink-4">
+                      App ID is only needed to upload template header images. It is detected from your access
+                      token automatically — fill it in if a template submit reports it could not be found.
+                    </p>
+
+                    <div className="flex items-center gap-3 border-t border-line-soft pt-3.5">
+                      <p className="text-sm text-ink-3">
+                        Status:{' '}
+                        {metaCfg.data?.configured ? (
+                          <span className="font-medium text-brand-ink">ready for send and webhook</span>
+                        ) : (
+                          <span>needs access token and app secret</span>
+                        )}
+                      </p>
+                      <button
+                        type="submit"
+                        disabled={upsertMetaCfg.isPending || !companyId}
+                        className="dc-btn dc-btn-primary ml-auto"
+                      >
+                        {upsertMetaCfg.isPending ? 'Saving…' : 'Save Meta credentials'}
+                      </button>
+                    </div>
+                  </form>
+                </WorkspaceCard>
+              </>
             ) : (
-              <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
-                Save credentials once to generate your webhook URL (needs PUBLIC_API_BASE_URL on the API).
-              </p>
-            )}
+              <WorkspaceCard>
+                <CardNote>Channel configuration is limited to company admins.</CardNote>
+              </WorkspaceCard>
+            )
+          ) : null}
 
-            <form onSubmit={onMetaConfig} className="mt-4 space-y-4">
-              <div>
-                <label htmlFor="meta-token" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  Access token{' '}
-                  {metaCfg.data?.accessTokenConfigured ? (
-                    <span className="font-normal text-emerald-600 dark:text-emerald-400">(saved)</span>
-                  ) : null}
-                </label>
-                <input
-                  id="meta-token"
-                  type="password"
-                  value={metaToken}
-                  onChange={(e) => setMetaToken(e.target.value)}
-                  placeholder={metaCfg.data?.accessTokenConfigured ? 'Leave blank to keep existing' : 'EAAG'}
-                  className={`${field} mt-1.5 font-mono text-[12px]`}
-                />
-              </div>
-              <div>
-                <label htmlFor="meta-app-secret" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  App secret{' '}
-                  {metaCfg.data?.appSecretConfigured ? (
-                    <span className="font-normal text-emerald-600 dark:text-emerald-400">(saved)</span>
-                  ) : null}
-                </label>
-                <input
-                  id="meta-app-secret"
-                  type="password"
-                  value={metaAppSecret}
-                  onChange={(e) => setMetaAppSecret(e.target.value)}
-                  placeholder={
-                    metaCfg.data?.appSecretConfigured ? 'Leave blank to keep existing' : 'App Settings, Basic'
-                  }
-                  className={`${field} mt-1.5 font-mono text-[12px]`}
-                />
-              </div>
-              <div>
-                <label htmlFor="meta-verify-token" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  Webhook verify token
-                </label>
-                <input
-                  id="meta-verify-token"
-                  value={metaVerifyTokenEdit}
-                  onChange={(e) => setMetaVerifyTokenEdit(e.target.value)}
-                  placeholder="Auto-generated if empty"
-                  className={`${field} mt-1.5 font-mono text-[12px]`}
-                />
-                <button
-                  type="button"
-                  onClick={() => void onRegenerateVerifyToken()}
-                  disabled={upsertMetaCfg.isPending}
-                  className="mt-2 text-xs font-semibold text-zinc-600 underline dark:text-zinc-400"
-                >
-                  Generate new verify token
-                </button>
-              </div>
-              <div>
-                <label htmlFor="meta-waba" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  WhatsApp Business Account ID <span className="font-normal text-zinc-400">(optional)</span>
-                </label>
-                <input
-                  id="meta-waba"
-                  value={metaWabaId}
-                  onChange={(e) => setMetaWabaId(e.target.value)}
-                  placeholder="76756565659623371"
-                  className={`${field} mt-1.5 font-mono text-[13px]`}
-                />
-              </div>
-              <div>
-                <label htmlFor="meta-app-id" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  App ID <span className="font-normal text-zinc-400">(optional)</span>
-                </label>
-                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                  Only needed to upload template header images. Detected from your access token
-                  automatically — fill this in if a template submit reports it could not be found.
-                </p>
-                <input
-                  id="meta-app-id"
-                  value={metaAppId}
-                  onChange={(e) => setMetaAppId(e.target.value)}
-                  placeholder="1234567890123456"
-                  className={`${field} mt-1.5 font-mono text-[13px]`}
-                />
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Status:{' '}
-                {metaCfg.data?.configured ? (
-                  <span className="font-medium text-emerald-700 dark:text-emerald-400">ready for send and webhook</span>
-                ) : (
-                  <span>needs access token and app secret</span>
-                )}
-              </p>
-              <button type="submit" disabled={upsertMetaCfg.isPending || !companyId} className={secondaryBtn}>
-                {upsertMetaCfg.isPending ? 'Saving…' : 'Save Meta credentials'}
-              </button>
-            </form>
-          </WorkspaceCard>
+          {/* ------------------------------------------------------ senders */}
+          {tab === 'senders' ? (
+            <>
+              {canManage ? (
+                <WorkspaceCard title="Meta WhatsApp sender">
+                  <form onSubmit={onMetaNumber} className="flex flex-col gap-3.5">
+                    <p className="text-sm text-ink-3">
+                      One sender per workspace — saving again updates the existing record. From Meta Developer →
+                      WhatsApp → API Setup, copy the full Phone number ID. Display phone must be E.164.
+                    </p>
+                    <div className="grid gap-3.5 sm:grid-cols-2">
+                      <label className="dc-label">
+                        <span className="dc-label-text">Phone number ID</span>
+                        <input
+                          value={metaPhoneNumberId}
+                          onChange={(e) => setMetaPhoneNumberId(e.target.value)}
+                          placeholder="111037888825216"
+                          className="dc-input font-mono text-sm"
+                          required
+                        />
+                      </label>
+                      <label className="dc-label">
+                        <span className="dc-label-text">Display phone (E.164)</span>
+                        <input
+                          value={metaDisplayPhone}
+                          onChange={(e) => setMetaDisplayPhone(e.target.value)}
+                          placeholder="+15558755467"
+                          className="dc-input font-mono text-sm"
+                          required
+                        />
+                      </label>
+                    </div>
+                    <label className="dc-label">
+                      <span className="dc-label-text">
+                        Label <span className="font-normal text-ink-4">(optional)</span>
+                      </span>
+                      <input
+                        value={metaSenderLabel}
+                        onChange={(e) => setMetaSenderLabel(e.target.value)}
+                        className="dc-input"
+                      />
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-base text-ink-2">
+                      <input
+                        type="checkbox"
+                        checked={metaIsDefault}
+                        onChange={(e) => setMetaIsDefault(e.target.checked)}
+                        className="dc-checkbox"
+                      />
+                      Set as default sender
+                    </label>
+                    <div className="flex border-t border-line-soft pt-3.5">
+                      <button
+                        type="submit"
+                        disabled={upsertWa.isPending || !companyId}
+                        className="dc-btn dc-btn-primary ml-auto"
+                      >
+                        {upsertWa.isPending ? 'Saving…' : 'Save Meta sender'}
+                      </button>
+                    </div>
+                  </form>
+                </WorkspaceCard>
+              ) : null}
 
-          <WorkspaceCard title="Meta WhatsApp sender (phone number ID)">
-            <form onSubmit={onMetaNumber} className="space-y-4">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                One sender per workspace — saving again updates the existing record. From Meta Developer,
-                WhatsApp, API Setup: copy the full Phone number ID. Display phone must be E.164 (e.g.
-                +917376103969).
-              </p>
-              <div>
-                <label htmlFor="meta-pnid" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  Phone number ID
-                </label>
-                <input
-                  id="meta-pnid"
-                  value={metaPhoneNumberId}
-                  onChange={(e) => setMetaPhoneNumberId(e.target.value)}
-                  placeholder="111037888825216"
-                  className={`${field} mt-1.5 font-mono text-[13px]`}
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="meta-display" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  Display phone (E.164)
-                </label>
-                <input
-                  id="meta-display"
-                  value={metaDisplayPhone}
-                  onChange={(e) => setMetaDisplayPhone(e.target.value)}
-                  placeholder="+15558755467"
-                  className={`${field} mt-1.5 font-mono text-[13px]`}
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="meta-slabel" className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                  Label <span className="font-normal text-zinc-400">(optional)</span>
-                </label>
-                <input
-                  id="meta-slabel"
-                  value={metaSenderLabel}
-                  onChange={(e) => setMetaSenderLabel(e.target.value)}
-                  className={`${field} mt-1.5`}
-                />
-              </div>
-              <label className="flex cursor-pointer items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                <input
-                  type="checkbox"
-                  checked={metaIsDefault}
-                  onChange={(e) => setMetaIsDefault(e.target.checked)}
-                  className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900"
-                />
-                Set as default sender
-              </label>
-              <button type="submit" disabled={upsertWa.isPending || !companyId} className={secondaryBtn}>
-                {upsertWa.isPending ? 'Saving…' : 'Save Meta sender'}
-              </button>
-            </form>
-          </WorkspaceCard>
-        </>
-      ) : null}
-
-      <WorkspaceCard title="Connected senders">
-        {!companyId ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace.</p>
-        ) : numbers.isLoading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
-        ) : connectedSenders.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">No senders yet. Add your Meta sender above.</p>
-        ) : (
-          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {connectedSenders.map((n) => (
-              <li key={n._id} className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0">
-                  <div className="font-mono text-sm text-zinc-900 dark:text-zinc-100">{n.phoneNumber}</div>
-                  <div className="mt-0.5 flex flex-wrap gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    <span className="rounded bg-zinc-100 px-1.5 py-0.5 font-semibold uppercase dark:bg-zinc-800">
-                      {(n.provider ?? 'twilio') === 'meta' ? 'Meta' : 'Twilio'}
-                    </span>
-                    {n.metaPhoneNumberId ? (
-                      <span className="font-mono">phone_number_id: {n.metaPhoneNumberId}</span>
-                    ) : null}
-                    {n.friendlyName ? <span>{n.friendlyName}</span> : null}
+              <WorkspaceCard title="Connected senders" flush>
+                {!companyId ? (
+                  <div className="p-4">
+                    <CardNote>Select a workspace.</CardNote>
                   </div>
-                </div>
-                {n.isDefault ? (
-                  <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                    Default
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </WorkspaceCard>
+                ) : numbers.isLoading ? (
+                  <div className="p-4">
+                    <CardNote>Loading…</CardNote>
+                  </div>
+                ) : !connectedSenders.length ? (
+                  <div className="p-4">
+                    <CardNote>No senders yet. Add your Meta sender above.</CardNote>
+                  </div>
+                ) : (
+                  <ul>
+                    {connectedSenders.map((n) => (
+                      <li
+                        key={n._id}
+                        className="flex flex-wrap items-center gap-3.5 border-b border-line-faint px-4 py-3.5 last:border-b-0"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[7px] bg-brand-soft text-base font-bold text-brand-ink">
+                          W
+                        </span>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <span className="font-mono text-base text-ink">{n.phoneNumber}</span>
+                          <span className="truncate text-sm text-ink-3">
+                            {(n.provider ?? 'twilio') === 'meta' ? 'Meta Cloud API' : 'Twilio'}
+                            {n.metaPhoneNumberId ? ` · ${n.metaPhoneNumberId}` : ''}
+                            {n.friendlyName ? ` · ${n.friendlyName}` : ''}
+                          </span>
+                        </div>
+                        {n.isDefault ? <span className="dc-badge dc-badge-brand ml-auto">Default</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </WorkspaceCard>
+            </>
+          ) : null}
+
+          {/* ------------------------------------------------------ company */}
+          {tab === 'company' ? (
+            canManage ? (
+              <WorkspaceCard title="Company profile">
+                <form onSubmit={onCompany} className="flex flex-col gap-3.5">
+                  <label className="dc-label">
+                    <span className="dc-label-text">Display name</span>
+                    <input value={cName} onChange={(e) => setCName(e.target.value)} className="dc-input max-w-md" />
+                  </label>
+
+                  {SHOW_TWILIO_UI ? (
+                    <label className="dc-label">
+                      <span className="dc-label-text">Default messaging provider</span>
+                      <select
+                        value={preferredProvider}
+                        onChange={(e) => setPreferredProvider(e.target.value as 'twilio' | 'meta')}
+                        className="dc-select max-w-md"
+                      >
+                        <option value="twilio">Twilio</option>
+                        <option value="meta">Meta (WhatsApp Cloud API)</option>
+                      </select>
+                      <span className="text-sm text-ink-4">
+                        Actual sends use the sender you choose on each campaign or chat.
+                      </span>
+                    </label>
+                  ) : null}
+
+                  <div className="flex border-t border-line-soft pt-3.5">
+                    <button
+                      type="submit"
+                      disabled={updateCompany.isPending || !companyId}
+                      className="dc-btn dc-btn-primary ml-auto"
+                    >
+                      {updateCompany.isPending ? 'Saving…' : 'Save company'}
+                    </button>
+                  </div>
+                </form>
+              </WorkspaceCard>
+            ) : (
+              <WorkspaceCard>
+                <CardNote>Company name changes are limited to admins.</CardNote>
+              </WorkspaceCard>
+            )
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

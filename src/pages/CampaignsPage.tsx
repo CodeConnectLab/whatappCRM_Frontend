@@ -12,8 +12,13 @@ import { useAuthStore } from '../store/authStore.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
 import { WhatsAppMessagePreview } from '../components/WhatsAppMessagePreview.tsx';
-import { WorkspaceAlertError, WorkspaceCard, WorkspaceIntro } from '../components/workspace/WorkspaceSurface.tsx';
-import { WORKSPACE_PAGE_BTN_CLASS } from '../lib/workspaceUi.ts';
+import {
+  CardNote,
+  PageHeader,
+  WorkspaceAlertError,
+  WorkspaceCard,
+} from '../components/workspace/WorkspaceSurface.tsx';
+import { IconClose, IconPlus } from '../components/Icons.tsx';
 import { visibleWhatsappSenders } from '../lib/visibleSenders.ts';
 
 function toIsoOrUndefined(localDatetime: string): string | undefined {
@@ -24,10 +29,20 @@ function toIsoOrUndefined(localDatetime: string): string | undefined {
   return d.toISOString();
 }
 
+/** Maps a backend status string onto one of the design's badge tones. */
+function statusBadgeClass(status: string): string {
+  const s = status.toLowerCase();
+  if (s === 'running' || s === 'completed' || s === 'sent') return 'dc-badge dc-badge-brand';
+  if (s === 'scheduled' || s === 'paused') return 'dc-badge dc-badge-warn';
+  if (s === 'failed' || s === 'cancelled') return 'dc-badge dc-badge-danger';
+  return 'dc-badge';
+}
+
 export function CampaignsPage() {
   const companyId = useAuthStore((s) => s.companyId);
   const workspaceRole = useAuthStore((s) => s.workspaceRole);
   const [page, setPage] = useState(1);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [name, setName] = useState('');
   const [whatsappNumberId, setWhatsappNumberId] = useState('');
   const [templateId, setTemplateId] = useState('');
@@ -49,9 +64,7 @@ export function CampaignsPage() {
   useEffect(() => {
     if (whatsappNumberId) return;
     const preferred =
-      summary.data?.defaultWhatsappNumberId ??
-      senders.find((n) => n.isDefault)?._id ??
-      senders[0]?._id;
+      summary.data?.defaultWhatsappNumberId ?? senders.find((n) => n.isDefault)?._id ?? senders[0]?._id;
     if (preferred) setWhatsappNumberId(preferred);
   }, [senders, summary.data?.defaultWhatsappNumberId, whatsappNumberId]);
 
@@ -64,6 +77,12 @@ export function CampaignsPage() {
     () => [...(q.data?.data ?? [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     [q.data?.data],
   );
+
+  const groupNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of groups.data ?? []) map.set(g._id, g.name);
+    return map;
+  }, [groups.data]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -78,42 +97,78 @@ export function CampaignsPage() {
       });
       setName('');
       setScheduledLocal('');
+      setComposerOpen(false);
     } catch (er) {
       setErr(apiErrorMessage(er));
     }
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 pb-4">
+    <div className="flex flex-col gap-[18px]">
       <NeedsCompanyBanner />
 
-      <WorkspaceIntro
-        kicker="Engage"
+      <PageHeader
         title="Campaigns"
-        description="Create draft broadcasts tied to a WhatsApp sender and an optional template. Start when credits and Meta are configured—recipients come from the contact group you attach."
+        description="One-time broadcasts tied to a WhatsApp sender and an approved template."
+        actions={
+          canManage ? (
+            <button
+              type="button"
+              className="dc-btn dc-btn-primary"
+              onClick={() => setComposerOpen((v) => !v)}
+              disabled={!companyId}
+            >
+              {composerOpen ? <IconClose className="h-3.5 w-3.5" /> : <IconPlus className="h-3.5 w-3.5" />}
+              {composerOpen ? 'Close' : 'New campaign'}
+            </button>
+          ) : null
+        }
       />
 
-      {canManage ? (
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      {err ? <WorkspaceAlertError>{err}</WorkspaceAlertError> : null}
+
+      {canManage && summary.data && !summary.data.metaReadyForCampaigns ? (
+        <div className="rounded-card border border-warn-line bg-warn-soft px-4 py-3 text-warn">
+          <p className="text-base font-semibold">Complete Meta setup before starting campaigns</p>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
+            {(summary.data.metaSetupIssues.length > 0
+              ? summary.data.metaSetupIssues
+              : ['Open Settings and finish Meta WhatsApp configuration']
+            ).map((issue) => (
+              <li key={issue}>{issue}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {!canManage ? (
+        <WorkspaceCard>
+          <CardNote>Only company admins create or control campaigns.</CardNote>
+        </WorkspaceCard>
+      ) : null}
+
+      {/* ---------------------------------------------------------- composer */}
+      {canManage && composerOpen ? (
+        <div className="grid items-start gap-4 lg:grid-cols-[1.4fr_1fr]">
           <WorkspaceCard title="New campaign">
-            <form className="space-y-4" onSubmit={onCreate}>
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">Campaign name</span>
+            <form className="flex flex-col gap-3.5" onSubmit={onCreate}>
+              <label className="dc-label">
+                <span className="dc-label-text">Campaign name</span>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 outline-none transition focus:border-emerald-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="dc-input"
                   required
                   placeholder="Spring promo blast"
                 />
               </label>
 
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">WhatsApp number</span>
+              <label className="dc-label">
+                <span className="dc-label-text">WhatsApp sender</span>
                 <select
                   value={whatsappNumberId}
                   onChange={(e) => setWhatsappNumberId(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="dc-select"
                   required
                 >
                   <option value="">Select a sender…</option>
@@ -126,14 +181,13 @@ export function CampaignsPage() {
                 </select>
               </label>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block text-sm sm:col-span-1">
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Template</span>
-                  <span className="mt-0.5 block text-xs text-zinc-500">Required before you start the campaign</span>
+              <div className="grid gap-3.5 sm:grid-cols-2">
+                <label className="dc-label">
+                  <span className="dc-label-text">Template</span>
                   <select
                     value={templateId}
                     onChange={(e) => setTemplateId(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                    className="dc-select"
                     required
                   >
                     <option value="">Select a template…</option>
@@ -143,15 +197,11 @@ export function CampaignsPage() {
                       </option>
                     ))}
                   </select>
+                  <span className="text-sm text-ink-4">Required before you start the campaign</span>
                 </label>
-                <label className="block text-sm sm:col-span-1">
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Contact group</span>
-                  <span className="mt-0.5 block text-xs text-zinc-500">Who receives this campaign</span>
-                  <select
-                    value={groupId}
-                    onChange={(e) => setGroupId(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
-                  >
+                <label className="dc-label">
+                  <span className="dc-label-text">Contact group</span>
+                  <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className="dc-select">
                     <option value="">— None —</option>
                     {(groups.data ?? []).map((g) => (
                       <option key={g._id} value={g._id}>
@@ -159,149 +209,164 @@ export function CampaignsPage() {
                       </option>
                     ))}
                   </select>
+                  <span className="text-sm text-ink-4">Who receives this campaign</span>
                 </label>
               </div>
 
-              <label className="block text-sm">
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">Schedule (optional)</span>
+              <label className="dc-label">
+                <span className="dc-label-text">Schedule (optional)</span>
                 <input
                   type="datetime-local"
                   value={scheduledLocal}
                   onChange={(e) => setScheduledLocal(e.target.value)}
-                  className="mt-1.5 w-full max-w-md rounded-xl border border-zinc-200 bg-zinc-50/50 px-3.5 py-2.5 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white"
+                  className="dc-input max-w-xs"
                 />
               </label>
 
-              <button
-                type="submit"
-                disabled={create.isPending || !companyId}
-                className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 disabled:opacity-50 sm:w-auto sm:px-8"
-              >
-                {create.isPending ? 'Saving…' : 'Create draft'}
-              </button>
+              <div className="flex gap-2 border-t border-line-soft pt-3.5">
+                <button type="button" className="dc-btn" onClick={() => setComposerOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={create.isPending || !companyId}
+                  className="dc-btn dc-btn-primary ml-auto px-5"
+                >
+                  {create.isPending ? 'Saving…' : 'Create draft'}
+                </button>
+              </div>
             </form>
           </WorkspaceCard>
 
-          <div className="lg:sticky lg:top-4">
-            <WorkspaceCard title="Template preview">
-              {!selectedTemplate ? (
-                <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/80 py-12 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
-                  Select a template to see how the WhatsApp bubble will look (including image and placeholders
-                  like {'{{name}}'}).
-                </div>
-              ) : (
-                <>
-                  <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-                    Showing sample data. Real sends use each contact&apos;s name, phone, and email.
-                  </p>
-                  <WhatsAppMessagePreview
-                    body={selectedTemplate.body}
-                    imageUrl={selectedTemplate.imageUrl}
-                    showRawPlaceholders={false}
-                    caption={selectedTemplate.name}
-                  />
-                </>
-              )}
-            </WorkspaceCard>
-          </div>
-        </div>
-      ) : (
-        <WorkspaceCard>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Only company admins create or control campaigns.
-          </p>
-        </WorkspaceCard>
-      )}
-
-      {err ? <WorkspaceAlertError>{err}</WorkspaceAlertError> : null}
-
-      {canManage && summary.data && !summary.data.metaReadyForCampaigns ? (
-        <div className="rounded-xl border border-amber-200/90 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/35 dark:text-amber-200">
-          <p className="font-medium">Complete Meta setup before starting campaigns</p>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
-            {(summary.data.metaSetupIssues.length > 0
-              ? summary.data.metaSetupIssues
-              : ['Open Settings and finish Meta WhatsApp configuration']
-            ).map((issue) => (
-              <li key={issue}>{issue}</li>
-            ))}
-          </ul>
+          <WorkspaceCard title="Template preview" className="lg:sticky lg:top-4">
+            {!selectedTemplate ? (
+              <div className="rounded-card border border-dashed border-line bg-muted py-10 text-center text-base text-ink-3">
+                Select a template to see the WhatsApp bubble, including image and placeholders like{' '}
+                {'{{name}}'}.
+              </div>
+            ) : (
+              <>
+                <p className="mb-3 text-sm text-ink-3">
+                  Showing sample data. Real sends use each contact&apos;s name, phone, and email.
+                </p>
+                <WhatsAppMessagePreview
+                  body={selectedTemplate.body}
+                  imageUrl={selectedTemplate.imageUrl}
+                  showRawPlaceholders={false}
+                  caption={selectedTemplate.name}
+                />
+              </>
+            )}
+          </WorkspaceCard>
         </div>
       ) : null}
 
-      {!companyId ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Select a workspace.</p>
-      ) : q.isLoading ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
-      ) : q.isError ? (
-        <WorkspaceAlertError>Failed to load campaigns.</WorkspaceAlertError>
-      ) : sortedCampaigns.length === 0 ? (
-        <WorkspaceCard title="Your campaigns">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">No campaigns yet. Create a draft above.</p>
-        </WorkspaceCard>
-      ) : (
-        <WorkspaceCard title="Your campaigns">
-          <ul className="space-y-3">
-            {sortedCampaigns.map((c) => (
-              <li
-                key={c._id}
-                className="flex flex-col gap-3 rounded-xl border border-zinc-100 bg-gradient-to-r from-zinc-50/80 to-white px-4 py-4 dark:border-zinc-800 dark:from-zinc-900/50 dark:to-zinc-900/30 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-zinc-900 dark:text-white">{c.name}</p>
-                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-                    {c.status}
-                    <span className="mx-2 text-zinc-300 dark:text-zinc-600">·</span>
-                    sent {c.stats?.sent ?? 0} / {c.stats?.total ?? 0}
-                  </p>
-                </div>
-                {canManage ? (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm disabled:opacity-50"
-                      disabled={action.isPending}
-                      onClick={() => void action.mutateAsync({ id: c._id, action: 'start' })}
-                    >
-                      Start
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium dark:border-zinc-600 dark:bg-zinc-950"
-                      disabled={action.isPending}
-                      onClick={() => void action.mutateAsync({ id: c._id, action: 'pause' })}
-                    >
-                      Pause
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium dark:border-zinc-600 dark:bg-zinc-950"
-                      disabled={action.isPending}
-                      onClick={() => void action.mutateAsync({ id: c._id, action: 'resume' })}
-                    >
-                      Resume
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
-                      disabled={action.isPending}
-                      onClick={() => void action.mutateAsync({ id: c._id, action: 'delete' })}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </WorkspaceCard>
-      )}
+      {/* ------------------------------------------------------------- table */}
+      <div className="dc-card">
+        {!companyId ? (
+          <div className="p-4">
+            <CardNote>Select a workspace.</CardNote>
+          </div>
+        ) : q.isLoading ? (
+          <div className="p-4">
+            <CardNote>Loading…</CardNote>
+          </div>
+        ) : q.isError ? (
+          <div className="p-4">
+            <CardNote>Failed to load campaigns.</CardNote>
+          </div>
+        ) : !sortedCampaigns.length ? (
+          <div className="p-4">
+            <CardNote>No campaigns yet. Create a draft with “New campaign”.</CardNote>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="dc-table dc-table-hover min-w-[720px]">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="pl-4">Campaign</th>
+                  <th>Channel</th>
+                  <th>Audience</th>
+                  <th>Status</th>
+                  <th className="text-right">Sent</th>
+                  <th className="text-right">Failed</th>
+                  <th className="pr-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedCampaigns.map((c) => {
+                  const audience = c.contactGroupIds?.length
+                    ? c.contactGroupIds.map((id) => groupNameById.get(id) ?? 'Group').join(', ')
+                    : c.contactIds?.length
+                      ? `${c.contactIds.length} contacts`
+                      : '—';
+                  return (
+                    <tr key={c._id}>
+                      <td className="pl-4 font-medium">{c.name}</td>
+                      <td>
+                        <span className="dc-badge dc-badge-brand">WhatsApp</span>
+                      </td>
+                      <td className="text-sm text-ink-3">{audience}</td>
+                      <td>
+                        <span className={statusBadgeClass(c.status)}>{c.status}</span>
+                      </td>
+                      <td className="dc-num">
+                        {c.stats?.sent ?? 0}
+                        <span className="text-ink-4"> / {c.stats?.total ?? 0}</span>
+                      </td>
+                      <td className={`dc-num ${c.stats?.failed ? 'text-danger' : ''}`}>{c.stats?.failed ?? 0}</td>
+                      <td className="pr-4">
+                        {canManage ? (
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              type="button"
+                              className="dc-btn dc-btn-xs dc-btn-primary"
+                              disabled={action.isPending}
+                              onClick={() => void action.mutateAsync({ id: c._id, action: 'start' })}
+                            >
+                              Start
+                            </button>
+                            <button
+                              type="button"
+                              className="dc-btn dc-btn-xs"
+                              disabled={action.isPending}
+                              onClick={() => void action.mutateAsync({ id: c._id, action: 'pause' })}
+                            >
+                              Pause
+                            </button>
+                            <button
+                              type="button"
+                              className="dc-btn dc-btn-xs"
+                              disabled={action.isPending}
+                              onClick={() => void action.mutateAsync({ id: c._id, action: 'resume' })}
+                            >
+                              Resume
+                            </button>
+                            <button
+                              type="button"
+                              className="dc-btn dc-btn-xs dc-btn-danger"
+                              disabled={action.isPending}
+                              onClick={() => void action.mutateAsync({ id: c._id, action: 'delete' })}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {q.data ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className={WORKSPACE_PAGE_BTN_CLASS}
+            className="dc-btn dc-btn-sm"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
@@ -309,13 +374,13 @@ export function CampaignsPage() {
           </button>
           <button
             type="button"
-            className={WORKSPACE_PAGE_BTN_CLASS}
+            className="dc-btn dc-btn-sm"
             disabled={page * q.data.limit >= q.data.total}
             onClick={() => setPage((p) => p + 1)}
           >
             Next
           </button>
-          <span className="text-zinc-500 dark:text-zinc-400">
+          <span className="text-sm text-ink-3">
             Page {page} · {q.data.total} total
           </span>
         </div>

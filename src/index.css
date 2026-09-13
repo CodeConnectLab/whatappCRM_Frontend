@@ -2,21 +2,283 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+   Design tokens. Channel triplets so Tailwind opacity modifiers work.
+   Light values come straight from the App Design spec.
+--------------------------------------------------------------------------- */
 @layer base {
+  :root {
+    --canvas: 248 250 252; /* #F8FAFC */
+    --surface: 255 255 255; /* #FFFFFF */
+    --subtle: 250 249 247; /* #FAF9F7 — inputs, chat canvas */
+    --muted: 249 250 251; /* #F9FAFB — table heads, inset panels */
+
+    --line: 229 231 235; /* #E5E7EB */
+    --line-soft: 243 244 246; /* #F3F4F6 */
+    --line-faint: 249 250 251; /* #F9FAFB — row separators */
+
+    --ink: 15 23 42; /* #0F172A */
+    --ink-2: 51 65 85; /* #334155 */
+    --ink-3: 100 116 139; /* #64748B */
+    --ink-4: 148 163 184; /* #94A3B8 */
+
+    --brand: 16 185 129; /* #10B981 */
+    --brand-strong: 5 150 105; /* #059669 */
+    --brand-soft: 236 253 245; /* #ECFDF5 */
+    --brand-line: 209 250 229; /* #D1FAE5 */
+    --brand-ink: 4 120 87; /* #047857 */
+
+    --accent: 99 102 241; /* #6366F1 */
+    --accent-soft: 238 242 255; /* #EEF2FF */
+    --accent-line: 199 210 254; /* #C7D2FE */
+    --accent-ink: 67 56 202; /* #4338CA */
+
+    --warn: 168 102 11; /* #A8660B */
+    --warn-soft: 253 246 236; /* #FDF6EC */
+    --warn-line: 240 224 196; /* #F0E0C4 */
+
+    --danger: 196 85 31; /* #C4551F */
+    --danger-soft: 254 242 242; /* #FEF2F2 */
+    --danger-line: 254 226 226; /* #FEE2E2 */
+
+    --app-bg: linear-gradient(180deg, #f0fdf4 0%, #f8fbfa 220px, #f8fafc 100%);
+    --scroll-thumb: 220 215 206;
+    --scroll-track: 250 249 247;
+  }
+
+  .dark {
+    --canvas: 8 12 20;
+    --surface: 17 24 36;
+    --subtle: 22 30 43;
+    --muted: 24 32 45;
+
+    --line: 39 50 66;
+    --line-soft: 31 41 55;
+    --line-faint: 27 36 50;
+
+    --ink: 241 245 249;
+    --ink-2: 203 213 225;
+    --ink-3: 148 163 184;
+    --ink-4: 113 128 150;
+
+    --brand: 52 211 153;
+    --brand-strong: 16 185 129;
+    --brand-soft: 6 45 38;
+    --brand-line: 6 78 59;
+    --brand-ink: 110 231 183;
+
+    --accent: 129 140 248;
+    --accent-soft: 30 32 66;
+    --accent-line: 55 48 120;
+    --accent-ink: 165 180 252;
+
+    --warn: 217 160 60;
+    --warn-soft: 48 36 18;
+    --warn-line: 82 60 26;
+
+    --danger: 232 130 79;
+    --danger-soft: 54 26 20;
+    --danger-line: 90 40 28;
+
+    --app-bg: linear-gradient(180deg, #0a1512 0%, #0a1017 220px, #080c14 100%);
+    --scroll-thumb: 47 60 79;
+    --scroll-track: 17 24 36;
+  }
+
   html {
     height: 100%;
   }
+
   body {
-    @apply text-zinc-900 dark:text-zinc-100;
     height: 100%;
     margin: 0;
     overflow: hidden;
+    background: var(--app-bg);
+    background-attachment: fixed;
+    @apply text-base text-ink;
   }
+
   #root {
     height: 100%;
     min-height: 100%;
   }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand ring-offset-1 ring-offset-surface;
+    border-radius: 4px;
+  }
+
   ::selection {
-    @apply bg-emerald-500/25 text-emerald-950 dark:bg-emerald-400/30 dark:text-white;
+    @apply bg-brand/25 text-brand-ink;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--scroll-thumb));
+    border: 3px solid rgb(var(--scroll-track));
+    border-radius: 99px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Component primitives — the shapes that repeat across every screen.
+--------------------------------------------------------------------------- */
+@layer components {
+  /* Sections & cards -------------------------------------------------- */
+  .dc-card {
+    @apply overflow-hidden rounded-card border border-line bg-surface;
+  }
+  .dc-card-pad {
+    @apply rounded-card border border-line bg-surface p-4;
+  }
+  .dc-card-head {
+    @apply flex items-center gap-2 border-b border-line-soft px-4 py-2.5;
+  }
+  .dc-card-title {
+    @apply text-base font-semibold text-ink;
+  }
+
+  /* Buttons ----------------------------------------------------------- */
+  .dc-btn {
+    @apply inline-flex h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-control border border-line
+      bg-surface px-3.5 text-base text-ink transition-colors
+      hover:bg-muted disabled:pointer-events-none disabled:opacity-50;
+  }
+  .dc-btn-primary {
+    @apply border-brand bg-brand text-white shadow-brand hover:bg-brand-strong;
+  }
+  .dc-btn-ghost {
+    @apply border-transparent bg-transparent text-ink-3 shadow-none hover:bg-line-soft;
+  }
+  .dc-btn-danger {
+    @apply border-danger-line bg-danger-soft text-danger hover:bg-danger-soft/70;
+  }
+  .dc-btn-sm {
+    @apply h-[30px] px-3 text-sm;
+  }
+  .dc-btn-xs {
+    @apply h-[28px] px-2.5 text-sm;
+  }
+  .dc-btn-link {
+    @apply bg-transparent p-0 text-sm text-brand hover:text-brand-strong;
+  }
+
+  /* Form controls ----------------------------------------------------- */
+  .dc-label {
+    @apply flex flex-col gap-1.5;
+  }
+  .dc-label-text {
+    @apply text-sm font-medium text-ink-2;
+  }
+  .dc-input {
+    @apply h-9 w-full rounded-control border border-line bg-surface px-2.5 text-base text-ink
+      placeholder:text-ink-4 focus:border-brand disabled:opacity-60;
+  }
+  .dc-textarea {
+    @apply w-full resize-y rounded-control border border-line bg-surface px-2.5 py-2 text-base text-ink
+      placeholder:text-ink-4 focus:border-brand;
+  }
+  .dc-select {
+    @apply h-9 w-full rounded-control border border-line bg-surface px-2.5 text-base text-ink focus:border-brand;
+  }
+  .dc-checkbox {
+    @apply h-3.5 w-3.5 cursor-pointer rounded-sm;
+    accent-color: rgb(var(--brand));
+  }
+
+  /* Tables ------------------------------------------------------------ */
+  .dc-table {
+    @apply w-full border-collapse;
+  }
+  .dc-table th {
+    @apply border-b border-line-soft px-3 py-2.5 text-left text-xs font-medium text-ink-3;
+  }
+  .dc-table td {
+    @apply border-b border-line-faint px-3 py-3 text-left align-middle text-base text-ink;
+  }
+  .dc-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .dc-table-hover tbody tr {
+    @apply transition-colors hover:bg-muted;
+  }
+  .dc-num {
+    @apply text-right tabular-nums;
+  }
+
+  /* Badges, chips, pills ---------------------------------------------- */
+  .dc-badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-[5px] border border-transparent
+      bg-line-soft px-2 py-0.5 text-xs font-medium text-ink-2;
+  }
+  .dc-badge-brand {
+    @apply border-brand-line bg-brand-soft text-brand-ink;
+  }
+  .dc-badge-accent {
+    @apply border-accent-line bg-accent-soft text-accent-ink;
+  }
+  .dc-badge-warn {
+    @apply border-warn-line bg-warn-soft text-warn;
+  }
+  .dc-badge-danger {
+    @apply border-danger-line bg-danger-soft text-danger;
+  }
+  .dc-pill {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line
+      bg-surface px-2.5 py-1 text-sm text-ink-2 transition-colors;
+  }
+  .dc-pill-active {
+    @apply border-ink bg-ink text-surface;
+  }
+  .dc-pill-brand {
+    @apply border-brand-line bg-brand-soft text-brand-ink;
+  }
+
+  /* Tab bar ------------------------------------------------------------ */
+  .dc-tabs {
+    @apply flex items-center gap-5 border-b border-line;
+  }
+  .dc-tab {
+    @apply -mb-px flex items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2.5 text-base
+      text-ink-3 transition-colors hover:text-ink;
+  }
+  .dc-tab-active {
+    @apply border-ink font-medium text-ink;
+  }
+
+  /* Notices ------------------------------------------------------------ */
+  .dc-note {
+    @apply flex flex-wrap items-center gap-2 rounded-control border border-line bg-muted px-3 py-2 text-sm text-ink-3;
+  }
+  .dc-note-warn {
+    @apply border-warn-line bg-warn-soft text-warn;
+  }
+  .dc-note-danger {
+    @apply border-danger-line bg-danger-soft text-danger;
+  }
+  .dc-note-brand {
+    @apply border-brand-line bg-brand-soft text-brand-ink;
+  }
+
+  /* Avatar -------------------------------------------------------------- */
+  .dc-avatar {
+    @apply flex shrink-0 items-center justify-center rounded-full bg-line-soft font-semibold text-ink-2;
+  }
+
+  /* Drawer / modal ------------------------------------------------------ */
+  .dc-scrim {
+    @apply fixed inset-0 z-50 flex bg-ink/30 backdrop-blur-[2px];
+  }
+  .dc-drawer {
+    @apply ml-auto flex h-full w-[min(30rem,100vw)] flex-col bg-surface shadow-drawer;
+  }
+  .dc-modal {
+    @apply m-auto flex w-[min(28rem,92vw)] flex-col rounded-panel bg-surface shadow-modal;
   }
 }

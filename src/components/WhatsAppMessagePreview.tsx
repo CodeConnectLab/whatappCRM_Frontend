@@ -13,7 +13,7 @@ function HighlightPlaceholders({ text }: { text: string }) {
         /^\{\{[^}]+\}\}$/.test(part) ? (
           <mark
             key={i}
-            className="rounded px-0.5 font-mono text-[0.9em] text-amber-950 dark:bg-amber-500/35 dark:text-amber-50"
+            className="rounded-[3px] border border-warn-line bg-warn-soft px-0.5 font-mono text-[0.9em] text-warn"
           >
             {part}
           </mark>
@@ -37,44 +37,33 @@ export function WhatsAppMessagePreview(props: {
   caption?: string;
 }) {
   const sample = props.sample ?? DEFAULT_PREVIEW_SAMPLE;
-  const rendered = useMemo(() => {
-    return applyTemplatePreview(props.body || ' ', sample);
-  }, [
-    props.body,
-    sample.name,
-    sample.phone,
-    sample.email,
-  ]);
+  const rendered = useMemo(
+    () => applyTemplatePreview(props.body || ' ', sample),
+    [props.body, sample.name, sample.phone, sample.email],
+  );
 
   const displayBody = props.showRawPlaceholders ? props.body : rendered;
   const safeImage = props.imageUrl?.trim();
 
   return (
-    <div className="flex min-h-[200px] flex-col rounded-2xl border border-zinc-200/90 bg-[#e5ddd5] bg-[length:64px_64px] p-4 shadow-inner dark:border-zinc-700/80 dark:bg-[#0b141a] md:p-5">
+    <div className="flex min-h-[180px] flex-col rounded-card border border-line bg-subtle p-4">
       {props.caption ? (
-        <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
-          {props.caption}
-        </p>
+        <p className="mb-3 text-center text-2xs uppercase tracking-[0.06em] text-ink-4">{props.caption}</p>
       ) : null}
-      <div className="flex flex-1 flex-col items-end justify-end">
-        <div
-          className="max-w-[95%] overflow-hidden rounded-lg rounded-br-sm shadow-md ring-1 ring-black/5 dark:ring-white/10"
-          style={{ boxShadow: '0 1px 0.5px rgba(0,0,0,.13)' }}
-        >
+      <div className="flex flex-1 flex-col items-end justify-end gap-2">
+        <div className="max-w-[95%] overflow-hidden rounded-[10px] rounded-br-[3px] border border-brand-line bg-brand-soft">
           {safeImage ? (
-            <div className="relative max-h-48 bg-zinc-900">
-              <img
-                src={safeImage}
-                alt=""
-                className="max-h-48 w-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
+            <img
+              src={safeImage}
+              alt=""
+              className="max-h-48 w-full border-b border-brand-line object-cover"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
           ) : null}
-          <div className="bg-[#d9fdd3] px-3 py-2 text-[14px] leading-snug text-zinc-900 dark:bg-emerald-900/55 dark:text-emerald-50">
+          <div className="px-3 py-2.5 text-base leading-relaxed text-ink">
             {props.showRawPlaceholders ? (
               <HighlightPlaceholders text={displayBody || 'Your message…'} />
             ) : (
@@ -82,9 +71,9 @@ export function WhatsAppMessagePreview(props: {
             )}
           </div>
         </div>
-        <p className="mt-2 text-center text-[10px] text-zinc-500 dark:text-zinc-500">
+        <p className="self-center text-2xs text-ink-4">
           {props.showRawPlaceholders
-            ? 'Tokens in amber are filled per contact when sending.'
+            ? 'Highlighted tokens are filled per contact when sending.'
             : 'Preview with sample data'}
         </p>
       </div>
