@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { api } from '../lib/api.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { useAuthStore } from '../store/authStore.ts';
@@ -161,6 +161,21 @@ export function LoginPage() {
               {mode === 'login' ? 'Need an account? Register' : 'Have an account? Sign in'}
             </button>
           </div>
+
+          {/* Public legal pages — kept reachable without signing in. */}
+          <p className="mt-6 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-ink-4">
+            <Link to="/privacy" className="hover:text-ink-2">
+              Privacy Policy
+            </Link>
+            <span aria-hidden>&middot;</span>
+            <Link to="/terms" className="hover:text-ink-2">
+              Terms of Service
+            </Link>
+            <span aria-hidden>&middot;</span>
+            <Link to="/data-deletion" className="hover:text-ink-2">
+              Data Deletion
+            </Link>
+          </p>
         </div>
       </div>
     </div>

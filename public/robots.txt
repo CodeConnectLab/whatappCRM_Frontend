@@ -1,0 +1,9 @@
+# The three legal pages must stay crawlable — Meta's app review rejects a
+# privacy policy or data deletion URL that is blocked or noindexed.
+User-agent: *
+Allow: /privacy
+Allow: /terms
+Allow: /data-deletion
+Allow: /
+
+Sitemap: https://wtsp.codeconnect.in/sitemap.xml
