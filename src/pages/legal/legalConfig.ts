@@ -5,10 +5,8 @@
  * These pages are submitted to Meta for WhatsApp app review, so they must stay
  * publicly reachable, return HTTP 200, and carry a visible "last updated" date.
  *
- * Anything still written as a `[FILL: …]` marker is a value that has to be
- * supplied before submitting for review — run
- *   grep -rn "FILL:" src/pages/legal
- * to find every remaining one.
+ * Infrastructure facts below are taken from the backend's SETUP_GUIDE.md. If
+ * the deployment moves, update this file — the pages read from it.
  */
 
 /** Bump BOTH dates whenever the wording of any legal page changes. */
@@ -20,12 +18,13 @@ export const APP_URL = 'https://wtsp.codeconnect.in';
 export const API_URL = 'https://wtspapi.codeconnect.in';
 
 export const LEGAL_ENTITY = 'CODEXBIT';
-/** e.g. "Private Limited" / "LLP" / "(a sole proprietorship)" — as registered. */
-export const LEGAL_ENTITY_SUFFIX_FILL = 'registered legal suffix, e.g. "Private Limited"';
+/** Follows the entity name in prose: "CODEXBIT, a sole proprietorship registered in India". */
+export const LEGAL_ENTITY_DESCRIPTOR = 'a sole proprietorship registered in India';
+/** A proprietorship has a proprietor, not directors — used in the indemnity clause. */
+export const LEGAL_ENTITY_PRINCIPALS = 'its proprietor, employees and contractors';
 
 export const CONTACT_EMAIL = 'hello@codexbit.in';
 export const ALT_EMAIL = 'codexbitlab@gmail.com';
-export const CONTACT_PHONE_FILL = 'contact phone number in E.164 form, e.g. +91 22 1234 5678';
 
 export const REGISTERED_ADDRESS_LINES = [
   'CODEXBIT',
@@ -55,11 +54,25 @@ export const RETENTION = {
   backupDays: 35,
 };
 
-export const HOSTING_REGION = 'Mumbai, India (ap-south-1)';
-export const HOSTING_PROVIDER_FILL =
-  'hosting provider actually used, e.g. "Amazon Web Services (AWS)" or "DigitalOcean"';
-export const EMAIL_PROVIDER_FILL =
-  'transactional email provider, e.g. "Amazon SES" / "Postmark" — or delete this row if no third-party email provider is used';
+/** Infrastructure, per backend SETUP_GUIDE.md sections 2, 4, 5 and 8. */
+export const INFRA = {
+  /** API server: AWS EC2, Ubuntu, nginx + Let's Encrypt. */
+  serverProvider: 'Amazon Web Services (AWS)',
+  serverRegion: 'Asia Pacific (Mumbai), ap-south-1',
+  /** Media files: AWS S3, same region. */
+  objectStorage: 'Amazon S3',
+  /** Primary database. */
+  database: 'MongoDB Atlas',
+  databaseRegion: 'Mumbai (ap-south-1)',
+  /** The web app itself is served from Vercel's edge network. */
+  frontendHost: 'Vercel',
+};
+
+/** Service commitments stated in the Terms. */
+export const SLA = {
+  uptime: '99.5%',
+  supportResponse: '1 business day',
+};
 
 export const LEGAL_ROUTES = [
   { to: '/privacy', label: 'Privacy Policy' },

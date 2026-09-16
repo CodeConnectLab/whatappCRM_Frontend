@@ -1,5 +1,4 @@
 import {
-  Fill,
   LegalLayout,
   LegalList,
   LegalNote,
@@ -11,15 +10,12 @@ import {
   API_URL,
   APP_URL,
   CONTACT_EMAIL,
-  CONTACT_PHONE_FILL,
   EFFECTIVE_DATE,
-  EMAIL_PROVIDER_FILL,
   GRIEVANCE_OFFICER,
-  HOSTING_PROVIDER_FILL,
-  HOSTING_REGION,
+  INFRA,
   LAST_UPDATED,
   LEGAL_ENTITY,
-  LEGAL_ENTITY_SUFFIX_FILL,
+  LEGAL_ENTITY_DESCRIPTOR,
   PRODUCT_NAME,
   REGISTERED_ADDRESS_LINES,
   RETENTION,
@@ -28,39 +24,36 @@ import {
 const TOC = [
   { id: 'who-we-are', title: 'Who we are, and our role' },
   { id: 'what-we-collect', title: 'What data we collect' },
-  { id: 'why-we-process', title: 'Why we process it, and our lawful basis' },
+  { id: 'why-we-process', title: 'Why we process it' },
   { id: 'whatsapp-meta', title: 'WhatsApp and Meta platform data' },
   { id: 'sharing', title: 'Who we share data with' },
   { id: 'retention', title: 'How long we keep data' },
   { id: 'security', title: 'How we protect data' },
-  { id: 'your-rights', title: 'Your rights, and how to use them' },
+  { id: 'your-rights', title: 'Your rights' },
   { id: 'end-consumers', title: 'If you messaged a business on WhatsApp' },
   { id: 'children', title: 'Children' },
   { id: 'cookies', title: 'Cookies and browser storage' },
   { id: 'changes', title: 'Changes to this policy' },
   { id: 'grievance', title: 'Grievance Officer' },
-  { id: 'governing-law', title: 'Governing law and jurisdiction' },
-  { id: 'contact', title: 'Contact us, and dates' },
+  { id: 'governing-law', title: 'Governing law' },
+  { id: 'contact', title: 'Contact and dates' },
 ];
 
 export function PrivacyPolicyPage() {
   return (
     <LegalLayout
       title="Privacy Policy"
-      subtitle={`How ${LEGAL_ENTITY} handles data in ${PRODUCT_NAME}, the WhatsApp Business inbox for teams.`}
+      subtitle={`How ${LEGAL_ENTITY} handles data in ${PRODUCT_NAME}, a WhatsApp Business inbox for teams.`}
     >
-      {/* ---- Framing: processor vs controller, stated before anything else ---- */}
       <LegalNote>
         <strong>Read this first.</strong> {PRODUCT_NAME} is software we sell to businesses. When a
-        business connects its WhatsApp number to our platform, that business decides what data is
-        collected from its customers and why — it is the <strong>data controller</strong>. We only
-        store and move that data on the business's instructions — we are the{' '}
-        <strong>data processor</strong>. If you are a consumer who messaged a business on WhatsApp,
-        you are not our user: you are that business's customer, and the business answers for your
-        data. Section 9 tells you exactly what to do if you want your data deleted.
+        business connects its WhatsApp Business number, that business decides what data is collected
+        from its customers and why — it is the <strong>data controller</strong>. We store and move
+        that data only on its instructions — we are the <strong>data processor</strong>. If you are
+        a consumer who messaged a business on WhatsApp, you are not our user: you are that
+        business's customer. Section 9 tells you how to get your data deleted.
       </LegalNote>
 
-      {/* ---- Table of contents ---- */}
       <nav aria-label="Table of contents" className="dc-card-pad">
         <h2 className="text-md font-semibold text-ink">On this page</h2>
         <ol className="mt-3 grid list-decimal gap-1.5 pl-5 marker:text-ink-4 sm:grid-cols-2">
@@ -77,8 +70,8 @@ export function PrivacyPolicyPage() {
       {/* ------------------------------------------------------------------ 1 */}
       <LegalSection id="who-we-are" n={1} title="Who we are, and our role">
         <p>
-          {PRODUCT_NAME} is operated by {LEGAL_ENTITY} <Fill>{LEGAL_ENTITY_SUFFIX_FILL}</Fill>, a
-          company registered in India. The web app runs at{' '}
+          {PRODUCT_NAME} is operated by {LEGAL_ENTITY}, {LEGAL_ENTITY_DESCRIPTOR}. The web app runs
+          at{' '}
           <a className="text-brand hover:text-brand-strong" href={APP_URL}>
             {APP_URL}
           </a>{' '}
@@ -89,286 +82,160 @@ export function PrivacyPolicyPage() {
           .
         </p>
         <p>
-          The product is a multi-tenant B2B platform. A business connects its own WhatsApp Business
-          number — through Meta's WhatsApp Business Cloud API — and its staff answer customer
-          conversations from a shared web inbox. Each business gets its own isolated{' '}
-          <strong>workspace</strong>.
+          A business connects its own WhatsApp Business number through Meta's WhatsApp Business
+          Cloud API, and its staff answer customer conversations from a shared web inbox. Each
+          business gets an isolated <strong>workspace</strong>.
         </p>
-
-        <LegalSubhead>Three groups of people, and who is responsible for each</LegalSubhead>
-        <LegalTable head={['Who', 'Relationship to us', 'Who is responsible']}>
+        <LegalTable head={['Who', 'Relationship to us', 'Who is responsible for their data']}>
           <tr>
             <td>
-              <strong>Business customers</strong> — the company that buys a workspace
+              <strong>Business customers</strong> and their staff
             </td>
-            <td>Our direct customer</td>
+            <td>Our direct customers and users</td>
             <td>
-              They are the controller for their customers' data. We are their processor. For their
-              own staff account data (names, emails, logins) we are the controller.
+              We are the controller for their account data, and their processor for everything in
+              their workspace.
             </td>
           </tr>
           <tr>
             <td>
-              <strong>Agents and admins</strong> — staff who log in to a workspace
-            </td>
-            <td>Our direct users</td>
-            <td>
-              We hold their account data to run the service, on their employer's instruction.
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <strong>End consumers</strong> — people who message a business on WhatsApp
+              <strong>End consumers</strong> who message a business
             </td>
             <td>
-              <strong>Not our users.</strong> We never contact them, and we have no relationship
-              with them.
+              <strong>Not our users.</strong> We never contact them.
             </td>
-            <td>
-              The business they messaged. We process those messages only because that business told
-              us to.
-            </td>
+            <td>The business they messaged. We act only on that business's instruction.</td>
           </tr>
         </LegalTable>
         <p>
-          This distinction matters in practice: we cannot decide on our own to delete, export or
-          hand over a workspace's conversations. We act on the business's instruction, or where the
-          law requires it of us.
+          This matters in practice: we cannot decide on our own to delete, export or disclose a
+          workspace's conversations. We act on the business's instruction, or where law requires it.
         </p>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 2 */}
       <LegalSection id="what-we-collect" n={2} title="What data we collect">
-        <p>This is the full list. Nothing else is collected.</p>
-
-        <LegalSubhead>2.1 Business user account data (our direct users)</LegalSubhead>
-        <LegalList>
-          <li>Name and email address.</li>
-          <li>
-            Password, stored only as a bcrypt hash (work factor 12). We never store, log or display
-            a password in plain text, and we cannot recover one for you.
-          </li>
-          <li>Workspace / company name and your role in it (company admin or agent).</li>
-          <li>Session tokens — a short-lived JWT access token and a refresh token.</li>
-          <li>
-            An activity audit log: which user performed which configuration action, and when.
-          </li>
-        </LegalList>
-
-        <LegalSubhead>2.2 Connected account credentials (supplied by the business)</LegalSubhead>
-        <LegalList>
-          <li>
-            Meta App ID, Meta App Secret, WhatsApp Business Account ID, Phone Number ID, long-lived
-            access token and webhook verify token.
-          </li>
-          <li>Optionally, a Twilio account SID and auth token.</li>
-          <li>Optionally, the business's own CRM base URL and CRM API key.</li>
-        </LegalList>
+        <LegalSubhead>Business account data (our direct users)</LegalSubhead>
         <p>
-          Every one of these secrets is encrypted at rest with AES-256-GCM. After you save a
-          credential it is never displayed back to you in full, and it is never shared with anyone
-          other than the service it authenticates to.
+          Name, email address, workspace name, role (admin or agent), a hashed password, session
+          tokens, and a log of which user changed which setting and when. Passwords are stored only
+          as a hash — never in plain text, and we cannot recover one for you.
         </p>
 
-        <LegalSubhead>
-          2.3 End-customer conversation data (processed for the business)
-        </LegalSubhead>
-        <LegalList>
-          <li>The WhatsApp phone number, in E.164 format, of the person messaging the business.</li>
-          <li>The WhatsApp public profile display name.</li>
-          <li>
-            Full message content: text bodies, media captions, button and list-reply titles, shared
-            location names and coordinates, contact-card names, and reaction emoji.
-          </li>
-          <li>Media identifiers for images, video, audio, documents and stickers.</li>
-          <li>
-            Message metadata: the WhatsApp message ID, timestamp, direction, delivery status (sent,
-            delivered, read, failed) and any failure reason.
-          </li>
-        </LegalList>
+        <LegalSubhead>Connected account credentials (supplied by the business)</LegalSubhead>
+        <p>
+          Meta App ID and secret, WhatsApp Business Account ID, Phone Number ID, access token and
+          webhook verify token. Optionally Twilio credentials, and the business's own CRM URL and
+          API key. All of these are encrypted at rest, are never shown back in full after saving,
+          and are used only to reach the service they authenticate to.
+        </p>
 
-        <LegalSubhead>2.4 Advertising attribution data (Click-to-WhatsApp ads)</LegalSubhead>
+        <LegalSubhead>Conversation data (processed for the business)</LegalSubhead>
+        <p>
+          The phone number and WhatsApp profile name of the person messaging the business, the
+          content of the messages (text, captions, button and list replies, shared locations,
+          contact cards, reactions), identifiers for any media sent, and message metadata —
+          WhatsApp message ID, timestamp, direction and delivery status.
+        </p>
+
+        <LegalSubhead>Ad attribution (Click-to-WhatsApp)</LegalSubhead>
         <p>
           When someone starts a chat by tapping a Meta ad, Meta attaches a referral object to that
-          first message. We store what Meta sends:
+          first message. We store what Meta sends — the click identifier, the ad or post ID and
+          URL, and the ad's headline and body — so the business can tell which advertisement
+          produced which enquiry. Meta supplies this with the message; we do not collect it from
+          anyone's device, and we run no tracking pixels or advertising SDKs.
         </p>
-        <LegalList>
-          <li>
-            <code className="font-mono text-sm">ctwa_clid</code> — Meta's click identifier for that
-            ad tap.
-          </li>
-          <li>
-            <code className="font-mono text-sm">source_id</code> (the ad or post ID),{' '}
-            <code className="font-mono text-sm">source_type</code> ("ad" or "post"), and{' '}
-            <code className="font-mono text-sm">source_url</code>.
-          </li>
-          <li>The ad's headline, body text, media type and media URLs.</li>
-        </LegalList>
+
+        <LegalSubhead>Contacts, campaigns, billing and logs</LegalSubhead>
         <p>
-          <strong>Why:</strong> so the business can see which advertisement produced which enquiry
-          and work out what its advertising is actually returning. Without it, every enquiry looks
-          identical and ad spend cannot be measured.
-        </p>
-        <p>
-          <strong>Where it comes from:</strong> Meta supplies this with the message. We do not
-          collect it from anyone's device, we do not track people across websites, and we run no
-          advertising pixels or SDKs.
+          Contacts the business uploads or creates (name, phone, email, tags), message templates it
+          submits to Meta, campaign records and delivery outcomes, its message credit balance and
+          ledger, and server logs containing IP address, request path, user agent and timestamp.
         </p>
 
-        <LegalSubhead>2.5 Contacts and campaigns</LegalSubhead>
+        <LegalSubhead>What we never do</LegalSubhead>
         <LegalList>
+          <li>We do not sell, rent or trade personal data.</li>
+          <li>We do not use message content to train AI or machine-learning models.</li>
+          <li>We do not use end-customer data for our own marketing.</li>
           <li>
-            Contacts the business uploads by CSV or creates by hand: name, phone number, email,
-            tags and free-form metadata fields the business defines.
+            We do not read a workspace's conversations, except when the business asks us to in order
+            to fix a problem, or where law requires it.
           </li>
-          <li>Message templates the business writes and submits to Meta for approval.</li>
-          <li>Broadcast campaign records and the delivery outcome for each recipient.</li>
-        </LegalList>
-
-        <LegalSubhead>2.6 Billing and usage</LegalSubhead>
-        <LegalList>
-          <li>The workspace's message credit balance.</li>
-          <li>A ledger of credit debits, one entry per message sent.</li>
-        </LegalList>
-
-        <LegalSubhead>2.7 Technical logs</LegalSubhead>
-        <LegalList>
-          <li>Server logs: IP address, request path, user agent and timestamp.</li>
-          <li>
-            Raw inbound webhook payloads from Meta and Twilio, kept short-term so we can debug a
-            message that did not arrive.
-          </li>
-        </LegalList>
-
-        <LegalSubhead>2.8 What we never do</LegalSubhead>
-        <LegalList>
-          <li>
-            We do <strong>not</strong> sell, rent or trade personal data to anyone, ever.
-          </li>
-          <li>
-            We do <strong>not</strong> use message content to train AI or machine-learning models.
-          </li>
-          <li>
-            We do <strong>not</strong> use end-customer data for our own marketing.
-          </li>
-          <li>
-            We do <strong>not</strong> read a workspace's conversations, except when the business
-            asks us to in order to fix a problem, or where the law requires it.
-          </li>
-          <li>
-            We do <strong>not</strong> combine or cross-reference data between different customer
-            workspaces.
-          </li>
+          <li>We do not combine data across different customer workspaces.</li>
         </LegalList>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 3 */}
-      <LegalSection id="why-we-process" n={3} title="Why we process it, and our lawful basis">
-        <LegalTable head={['Data', 'Why we process it', 'Lawful basis']}>
+      <LegalSection id="why-we-process" n={3} title="Why we process it">
+        <LegalTable head={['Data', 'Purpose', 'Basis']}>
           <tr>
-            <td>Account data (2.1)</td>
-            <td>To create logins, authenticate users, and apply role-based permissions.</td>
-            <td>Performance of our contract with the business customer.</td>
+            <td>Account data and audit log</td>
+            <td>Create logins, authenticate users, apply permissions, show admins what changed.</td>
+            <td>Performance of our contract with the business.</td>
           </tr>
           <tr>
-            <td>Audit log (2.1)</td>
-            <td>
-              So a workspace admin can see who changed a setting, and so we can investigate misuse.
-            </td>
-            <td>Legitimate interest in security and accountability.</td>
+            <td>Connected credentials</td>
+            <td>Call Meta's or Twilio's API for the business and verify inbound webhooks.</td>
+            <td>Performance of contract — the business supplies these deliberately.</td>
           </tr>
           <tr>
-            <td>Connected credentials (2.2)</td>
+            <td>Conversation and ad attribution data</td>
+            <td>Deliver, display and store messages; attribute an enquiry to the ad behind it.</td>
             <td>
-              To call Meta's or Twilio's API on the business's behalf and to verify incoming
-              webhooks.
-            </td>
-            <td>Performance of contract; the business supplies these deliberately.</td>
-          </tr>
-          <tr>
-            <td>Conversation data (2.3)</td>
-            <td>
-              To deliver, display, store and search the messages between a business and its
-              customers.
-            </td>
-            <td>
-              Processed on the business's documented instruction. The business is responsible for
-              having a valid basis — normally the consumer's consent or its own contract with them.
+              Processed on the business's instruction. The business is responsible for having a
+              valid basis, normally its customer's consent.
             </td>
           </tr>
           <tr>
-            <td>Ad attribution (2.4)</td>
-            <td>To attribute an enquiry to the advertisement that produced it.</td>
+            <td>Contacts and campaigns</td>
+            <td>Send the template messages and broadcasts the business has set up.</td>
             <td>
-              The business's legitimate interest in measuring its own advertising, on its
-              instruction.
+              The business's instruction. It must hold valid opt-in from every recipient (see our
+              Terms).
             </td>
           </tr>
           <tr>
-            <td>Contacts and campaigns (2.5)</td>
-            <td>To send template messages and broadcasts the business has set up.</td>
-            <td>
-              The business's instruction. The business must hold valid opt-in from every recipient
-              (see our Terms).
-            </td>
+            <td>Billing and usage</td>
+            <td>Meter credits, invoice correctly, keep tax records.</td>
+            <td>Performance of contract; legal obligation under Indian tax law.</td>
           </tr>
           <tr>
-            <td>Billing and usage (2.6)</td>
-            <td>To meter message credits, invoice correctly, and keep tax records.</td>
-            <td>Performance of contract; legal obligation under Indian tax and accounting law.</td>
-          </tr>
-          <tr>
-            <td>Technical logs (2.7)</td>
-            <td>To keep the service up, diagnose failed deliveries, and detect abuse.</td>
-            <td>Legitimate interest in security and service reliability.</td>
-          </tr>
-          <tr>
-            <td>Transactional email to our users</td>
-            <td>Password resets, security notices, service and billing notifications.</td>
-            <td>Performance of contract. These are not marketing and cannot be opted out of.</td>
+            <td>Server logs</td>
+            <td>Keep the service running, diagnose failed deliveries, detect abuse.</td>
+            <td>Legitimate interest in security and reliability.</td>
           </tr>
         </LegalTable>
-        <p>
-          Where consent is the basis for something, it can be withdrawn at any time — see section 8.
-          Withdrawing consent does not undo processing that already happened lawfully.
-        </p>
+        <p>Where we rely on consent, it can be withdrawn at any time — see section 8.</p>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 4 */}
       <LegalSection id="whatsapp-meta" n={4} title="WhatsApp and Meta platform data">
         <LegalNote>
-          Data we obtain through Meta's APIs is used for exactly one purpose: providing the
-          messaging service to the business that authorised the connection. It is not sold, not
-          repurposed, and not shared with anyone else.
+          Data we obtain through Meta's APIs is used for one purpose only: providing the messaging
+          service to the business that authorised the connection. It is not sold, not repurposed,
+          and not shared with anyone else.
         </LegalNote>
         <p>
           {PRODUCT_NAME} connects to the <strong>WhatsApp Business Cloud API</strong> operated by
-          Meta Platforms. A business customer supplies its own Meta credentials, which authorises us
-          to send and receive messages for its WhatsApp Business number.
+          Meta Platforms. The business customer supplies its own Meta credentials, which authorise
+          us to send and receive messages for its WhatsApp Business number.
         </p>
-        <LegalSubhead>What we do with Meta platform data</LegalSubhead>
-        <LegalList>
-          <li>
-            Deliver outbound messages and campaigns that the authorising business composed and sent.
-          </li>
-          <li>Receive inbound messages and show them in that business's inbox.</li>
-          <li>Record delivery status so the business knows whether a message arrived.</li>
-          <li>
-            Store ad-referral data (section 2.4) so the business can attribute enquiries to its own
-            advertising.
-          </li>
-          <li>
-            Submit message templates the business wrote to Meta for approval, and report the
-            outcome back.
-          </li>
-        </LegalList>
-        <LegalSubhead>What we never do with Meta platform data</LegalSubhead>
+        <LegalSubhead>What we do with it</LegalSubhead>
+        <p>
+          Deliver the messages and campaigns the authorising business composed, receive inbound
+          messages into that business's inbox, record delivery status, store ad-referral data so the
+          business can attribute its own enquiries, and submit the business's message templates to
+          Meta for approval.
+        </p>
+        <LegalSubhead>What we never do with it</LegalSubhead>
         <LegalList>
           <li>Sell it, license it, or transfer it to a data broker or any other third party.</li>
-          <li>Use it to train AI or machine-learning models, ours or anyone else's.</li>
+          <li>Use it to train AI or machine-learning models.</li>
           <li>Use it to build advertising profiles, or for our own marketing.</li>
           <li>Merge it with another workspace's data, or with data from any other source.</li>
-          <li>Retain it after the authorising business asks us to delete it (see section 6).</li>
+          <li>Keep it once the authorising business asks us to delete it.</li>
         </LegalList>
         <p>
           We handle this data in accordance with Meta's{' '}
@@ -411,18 +278,14 @@ export function PrivacyPolicyPage() {
         </p>
         <p>
           {LEGAL_ENTITY} is an independent software vendor. We are not affiliated with, endorsed by,
-          sponsored by, or acting as an agent of Meta Platforms, Inc. or any of its group companies.
-          "WhatsApp" and "Meta" are their trademarks, used here only to describe what our software
-          connects to.
+          or acting as an agent of Meta Platforms, Inc. or any of its group companies. "WhatsApp"
+          and "Meta" are their trademarks, used here only to describe what our software connects to.
         </p>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 5 */}
       <LegalSection id="sharing" n={5} title="Who we share data with">
-        <p>
-          We share data with the following sub-processors, and with nobody else. Each receives only
-          what it needs to do its job.
-        </p>
+        <p>These are our sub-processors. Each receives only what it needs.</p>
         <LegalTable head={['Who', 'What it receives', 'Why']}>
           <tr>
             <td>
@@ -453,143 +316,103 @@ export function PrivacyPolicyPage() {
           </tr>
           <tr>
             <td>
-              <strong>
-                <Fill>{HOSTING_PROVIDER_FILL}</Fill>
-              </strong>
+              <strong>{INFRA.serverProvider}</strong>
             </td>
-            <td>All application data at rest, and media files in S3-compatible object storage.</td>
-            <td>Server hosting and file storage. Region: {HOSTING_REGION}.</td>
+            <td>Application data on our servers, and media files in object storage.</td>
+            <td>Hosting and file storage, in {INFRA.serverRegion}.</td>
           </tr>
           <tr>
             <td>
-              <strong>MongoDB Atlas</strong>
+              <strong>{INFRA.database}</strong>
             </td>
-            <td>The primary database: accounts, chats, messages, contacts, campaigns, ledgers.</td>
-            <td>Managed database hosting, in {HOSTING_REGION}.</td>
+            <td>The primary database: accounts, chats, contacts, campaigns, ledgers.</td>
+            <td>Managed database hosting, in {INFRA.databaseRegion}.</td>
           </tr>
           <tr>
             <td>
-              <strong>Redis</strong>
+              <strong>{INFRA.frontendHost}</strong>
             </td>
-            <td>Transient job payloads — queued campaign sends and background jobs.</td>
-            <td>
-              Job queueing. Entries are short-lived and removed once the job completes.
-            </td>
+            <td>Ordinary web server access logs — IP address, user agent, pages requested.</td>
+            <td>Serving the web app. No message content passes through it.</td>
           </tr>
           <tr>
             <td>
               <strong>Twilio</strong>
             </td>
-            <td>Message content and recipient numbers — only for workspaces that choose Twilio.</td>
+            <td>Message content and recipient numbers.</td>
             <td>
-              An alternative message transport. If a workspace uses Meta only, Twilio receives
+              Only for workspaces that choose Twilio instead of Meta. Otherwise Twilio receives
               nothing.
             </td>
           </tr>
           <tr>
             <td>
-              <strong>The business customer's own CRM</strong>
+              <strong>The business's own CRM</strong>
             </td>
-            <td>Lead details and ad-attribution fields from its own conversations.</td>
+            <td>Lead details from its own conversations.</td>
             <td>
-              Only when that workspace switches the CRM bridge on and supplies its own CRM URL and
-              API key. The business chooses whether this runs, what it pushes, and can switch it off
-              at any time in Settings. We never send data to a CRM we chose.
+              Only when that business switches the CRM bridge on and supplies its own CRM
+              credentials. This returns the business's data to a system it controls, and it can
+              switch it off at any time.
             </td>
-          </tr>
-          <tr>
-            <td>
-              <strong>
-                <Fill>{EMAIL_PROVIDER_FILL}</Fill>
-              </strong>
-            </td>
-            <td>Our users' names and email addresses.</td>
-            <td>Sending transactional email — password resets and service notices.</td>
           </tr>
         </LegalTable>
         <p>
-          We will also disclose data where we are legally compelled to — a binding court order,
-          summons or lawful demand from an Indian authority. Where we are allowed to tell the
-          affected business first, we will.
-        </p>
-        <p>
-          If {LEGAL_ENTITY} is ever merged or acquired, customer data may transfer to the successor
-          entity. It would remain subject to a policy no less protective than this one, and
-          customers would be notified before any transfer takes effect.
+          We also disclose data where legally compelled — a binding court order or lawful demand
+          from an Indian authority. If the {PRODUCT_NAME} business is sold or transferred, customer
+          data may pass to the acquirer under a policy no less protective than this one, and
+          customers would be told first.
         </p>
         <LegalSubhead>Transfers outside India</LegalSubhead>
         <p>
-          Our infrastructure is provisioned in {HOSTING_REGION}, so data normally stays in India.
-          Some processing happens outside India anyway: Meta operates the WhatsApp Cloud API
-          globally, Twilio and our email provider run international infrastructure, and our
-          providers may replicate data to other regions for resilience or route support requests
-          through staff abroad.
-        </p>
-        <p>
-          Where that happens, we rely on contractual safeguards with each provider — data processing
-          agreements with confidentiality, security and purpose-limitation terms, and Standard
-          Contractual Clauses where the provider offers them — and we transfer only to countries not
-          restricted by the Government of India under the Digital Personal Data Protection Act,
-          2023.
+          Our servers, database and file storage are all in {INFRA.serverRegion}, so conversations,
+          contacts and media stay in India at rest. Some processing happens abroad regardless: Meta
+          operates the WhatsApp Cloud API globally, Twilio runs international infrastructure, and{' '}
+          {INFRA.frontendHost} serves the web app from edge locations worldwide. Where that happens
+          we rely on data processing agreements with each provider carrying confidentiality,
+          security and purpose-limitation terms.
         </p>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 6 */}
       <LegalSection id="retention" n={6} title="How long we keep data">
-        <LegalTable head={['Data', 'How long we keep it']}>
+        <LegalTable head={['Data', 'How long']}>
           <tr>
             <td>Conversations, messages, media and contacts</td>
             <td>
-              For as long as the workspace is active. Deleted within{' '}
-              <strong>{RETENTION.conversationDaysAfterClosure} days</strong> of the account being
-              closed, or sooner if the business asks.
+              While the workspace is active. Deleted within{' '}
+              <strong>{RETENTION.conversationDaysAfterClosure} days</strong> of account closure, or
+              sooner if the business asks.
             </td>
           </tr>
           <tr>
-            <td>Business user accounts and workspace settings</td>
+            <td>Business accounts and workspace settings</td>
             <td>
               Deleted within {RETENTION.conversationDaysAfterClosure} days of account closure.
             </td>
           </tr>
           <tr>
-            <td>Connected credentials (Meta, Twilio, CRM)</td>
-            <td>
-              Deleted immediately when you remove them in Settings, and at account closure. We do
-              not keep a copy.
-            </td>
+            <td>Connected credentials</td>
+            <td>Deleted as soon as you remove them in Settings, and at account closure.</td>
           </tr>
           <tr>
-            <td>Server logs</td>
+            <td>Server and webhook logs</td>
             <td>
               <strong>{RETENTION.serverLogDays} days</strong>, then deleted automatically.
             </td>
           </tr>
           <tr>
-            <td>Raw webhook payload logs</td>
+            <td>Billing records and the credit ledger</td>
             <td>
-              <strong>{RETENTION.webhookLogDays} days</strong>, then deleted automatically.
-            </td>
-          </tr>
-          <tr>
-            <td>Billing records, invoices and the credit ledger</td>
-            <td>
-              <strong>{RETENTION.billingYears} years</strong>, as required by Indian tax and
-              accounting law. Kept even after the account closes, and not deletable on request.
-            </td>
-          </tr>
-          <tr>
-            <td>Configuration audit log</td>
-            <td>
-              {RETENTION.billingYears} years where it forms part of a billing or compliance record;
-              otherwise deleted with the workspace.
+              <strong>{RETENTION.billingYears} years</strong>, as Indian tax and accounting law
+              requires. Not deletable on request.
             </td>
           </tr>
           <tr>
             <td>Encrypted backups</td>
             <td>
-              Rotated out within <strong>{RETENTION.backupDays} days</strong>. Deleted records
-              persist in a backup only until that backup ages out, and are never restored into the
-              live service.
+              Rotated out within <strong>{RETENTION.backupDays} days</strong>. Deleted records are
+              never restored into the live service.
             </td>
           </tr>
         </LegalTable>
@@ -599,52 +422,33 @@ export function PrivacyPolicyPage() {
       <LegalSection id="security" n={7} title="How we protect data">
         <LegalList>
           <li>
-            <strong>Encryption of stored credentials.</strong> Every third-party secret — Meta app
-            secrets and access tokens, Twilio auth tokens, CRM API keys — is encrypted at rest with
-            AES-256-GCM, an authenticated cipher, with a unique initialisation vector per value.
+            Third-party credentials — Meta, Twilio and CRM secrets — are encrypted at rest with
+            AES-256.
+          </li>
+          <li>Passwords are stored as bcrypt hashes, never in plain text.</li>
+          <li>All traffic to the app and API runs over HTTPS. Plain HTTP is not served.</li>
+          <li>
+            Inbound webhooks are rejected unless their cryptographic signature verifies, so a forged
+            payload cannot inject messages into a workspace.
+          </li>
+          <li>Every request is authorised against the user's role before it reaches data.</li>
+          <li>
+            Every query is scoped to one workspace. A workspace cannot read, search or export
+            another's data.
           </li>
           <li>
-            <strong>Password hashing.</strong> Passwords are hashed with bcrypt at work factor 12
-            and are never stored or logged in plain text.
-          </li>
-          <li>
-            <strong>Encryption in transit.</strong> All traffic to the app and API runs over HTTPS /
-            TLS. Plain HTTP is not served.
-          </li>
-          <li>
-            <strong>Webhook signature verification.</strong> Inbound Meta webhooks are verified
-            against the <code className="font-mono text-sm">X-Hub-Signature-256</code> header, so a
-            forged payload cannot inject messages into a workspace. Twilio webhooks are validated
-            against Twilio's own signature.
-          </li>
-          <li>
-            <strong>Role-based access control.</strong> Every API request is authorised against the
-            caller's role (company admin or agent) before it touches data.
-          </li>
-          <li>
-            <strong>Per-workspace isolation.</strong> Every query is scoped to the caller's
-            workspace. One workspace cannot read, search or export another's chats, contacts or
-            credentials.
-          </li>
-          <li>
-            <strong>Short-lived sessions.</strong> Access tokens expire quickly and are renewed
-            through a separate refresh token, which is revoked at logout.
-          </li>
-          <li>
-            <strong>Least-privilege staff access.</strong> Access to production data is limited to
-            the few staff who need it to operate the service, and is used for support and
-            troubleshooting only.
+            Access to production data is limited to staff who need it to operate the service, and is
+            used only for support and troubleshooting.
           </li>
         </LegalList>
         <p>
-          No system is perfectly secure, and we will not claim otherwise. If a breach affects
-          personal data we hold, we will notify the affected business customers and the Data
-          Protection Board of India without undue delay, as the DPDP Act requires.
+          If a breach affects personal data we hold, we will notify the affected businesses and the
+          Data Protection Board of India without undue delay, as the DPDP Act requires.
         </p>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 8 */}
-      <LegalSection id="your-rights" n={8} title="Your rights, and how to use them">
+      <LegalSection id="your-rights" n={8} title="Your rights">
         <p>
           If you are a business customer or one of its users, write to{' '}
           <a className="text-brand hover:text-brand-strong" href={`mailto:${CONTACT_EMAIL}`}>
@@ -653,20 +457,23 @@ export function PrivacyPolicyPage() {
           from your registered email address. We respond within {GRIEVANCE_OFFICER.responseDays}{' '}
           days.
         </p>
-        <LegalTable head={['Right', 'What it means', 'How to use it']}>
+        <LegalTable head={['Right', 'How to use it']}>
           <tr>
-            <td>Access</td>
-            <td>A copy of the personal data we hold about you, and a summary of processing.</td>
+            <td>
+              <strong>Access</strong> — a copy of the data we hold about you
+            </td>
             <td>Email us, or read most of it directly in the app.</td>
           </tr>
           <tr>
-            <td>Correction</td>
-            <td>Fix data that is wrong, incomplete or out of date.</td>
+            <td>
+              <strong>Correction</strong> — fix data that is wrong or out of date
+            </td>
             <td>Edit it in Settings, or email us.</td>
           </tr>
           <tr>
-            <td>Deletion</td>
-            <td>Erase your account or your workspace's data.</td>
+            <td>
+              <strong>Deletion</strong> — erase your account or workspace data
+            </td>
             <td>
               See the{' '}
               <a className="text-brand hover:text-brand-strong" href="/data-deletion">
@@ -676,37 +483,23 @@ export function PrivacyPolicyPage() {
             </td>
           </tr>
           <tr>
-            <td>Portability</td>
-            <td>Your contacts, chats and campaign records in a machine-readable format.</td>
-            <td>Export from the app, or ask us for a JSON/CSV export.</td>
+            <td>
+              <strong>Portability</strong> — your data in a machine-readable format
+            </td>
+            <td>Export from the app, or ask us.</td>
           </tr>
           <tr>
-            <td>Objection</td>
-            <td>Object to processing we base on legitimate interest.</td>
             <td>
-              Email us with your reason. We stop unless we have grounds that override yours, and we
-              will explain which.
+              <strong>Objection and withdrawal of consent</strong>
+            </td>
+            <td>
+              Email us, or switch the feature off in Settings. Withdrawing is as easy as consenting.
             </td>
           </tr>
           <tr>
-            <td>Withdraw consent</td>
-            <td>Withdraw consent where consent is what we relied on.</td>
             <td>
-              Email us, or switch the feature off in Settings. As easy to withdraw as it was to
-              give.
+              <strong>Complain</strong>
             </td>
-          </tr>
-          <tr>
-            <td>Nominate</td>
-            <td>
-              Name someone to exercise these rights for you if you die or become incapacitated (a
-              DPDP Act right).
-            </td>
-            <td>Email us their details.</td>
-          </tr>
-          <tr>
-            <td>Complain</td>
-            <td>Raise a grievance about how we handled your data.</td>
             <td>
               Our Grievance Officer (section 13), then the Data Protection Board of India if you are
               not satisfied.
@@ -714,64 +507,42 @@ export function PrivacyPolicyPage() {
           </tr>
         </LegalTable>
         <p>
-          We may ask you to confirm your identity before we act, to make sure we are not handing
-          your data to someone else. There is no charge unless a request is repetitive or clearly
-          excessive.
-        </p>
-        <p>
-          <strong>One limit worth stating plainly.</strong> For conversation data inside a
-          workspace, we are the processor. If you ask us to delete or export data that belongs to a
-          business's workspace, we must forward that request to the business and act on its
-          instruction — see section 9.
+          We may ask you to confirm your identity first, so we do not hand your data to someone
+          else. One limit worth stating plainly: for data inside a business's workspace we are the
+          processor, so we must forward your request to that business and act on its instruction —
+          see section 9.
         </p>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 9 */}
       <LegalSection id="end-consumers" n={9} title="If you messaged a business on WhatsApp">
         <p>
-          You are not our user, and we did not collect your data for ourselves. A business you
-          contacted on WhatsApp uses our software to read and answer your messages. That business
-          decides what to keep and for how long.
+          You are not our user. A business you contacted uses our software to read and answer your
+          messages, and it decides what to keep.
         </p>
-        <LegalSubhead>To have your data deleted</LegalSubhead>
         <ol className="flex list-decimal flex-col gap-2 pl-5 marker:text-ink-4">
           <li>
-            <strong>Contact the business directly.</strong> This is the fastest route — it can
-            delete your conversation itself, from its own inbox. Ask it to delete your chat history
-            and contact record.
+            <strong>Contact the business directly.</strong> This is fastest — it can delete your
+            conversation itself, from its own inbox.
           </li>
           <li>
             <strong>Or write to us</strong> at{' '}
             <a className="text-brand hover:text-brand-strong" href={`mailto:${CONTACT_EMAIL}`}>
               {CONTACT_EMAIL}
             </a>
-            . Include the WhatsApp number you messaged from, the name or WhatsApp number of the
-            business you contacted, and what you want deleted. We will identify the workspace, pass
-            your request to that business, and carry out its instruction. We will confirm back to
-            you within {GRIEVANCE_OFFICER.responseDays} days.
+            . Include the WhatsApp number you messaged from, the business you contacted, and what
+            you want deleted. We will find the workspace, pass your request to that business, carry
+            out its instruction, and confirm back to you within {GRIEVANCE_OFFICER.responseDays}{' '}
+            days.
           </li>
         </ol>
         <p>
-          We cannot delete a business's records on our own initiative, because they are not ours to
-          decide about — but we will not ignore your request either, and we will tell you what
-          happened to it. The step-by-step version is on the{' '}
+          The step-by-step version is on the{' '}
           <a className="text-brand hover:text-brand-strong" href="/data-deletion">
             Data Deletion page
           </a>
-          .
-        </p>
-        <p>
-          Deleting data from this platform does not delete the messages on your own phone, or
-          anything WhatsApp itself holds. For that, see{' '}
-          <a
-            className="text-brand hover:text-brand-strong"
-            href="https://www.whatsapp.com/legal/privacy-policy"
-            target="_blank"
-            rel="noreferrer"
-          >
-            WhatsApp's privacy policy
-          </a>
-          .
+          . Deleting data here does not delete messages on your own phone, or anything WhatsApp
+          itself holds.
         </p>
       </LegalSection>
 
@@ -779,15 +550,11 @@ export function PrivacyPolicyPage() {
       <LegalSection id="children" n={10} title="Children">
         <p>
           {PRODUCT_NAME} is a business tool and is not directed at anyone under 18. We do not
-          knowingly create accounts for minors, and we do not knowingly process a child's personal
-          data for our own purposes. Under India's DPDP Act, processing a child's data requires
-          verifiable parental consent, and we do not run tracking or behavioural advertising
-          directed at children — we run none at all.
+          knowingly create accounts for minors, and we run no tracking or behavioural advertising —
+          none at all. Business customers must not use the platform to target children.
         </p>
         <p>
-          Business customers must not use the platform to target children. If you believe a minor
-          has an account with us, or that a workspace is processing a child's data unlawfully,
-          write to{' '}
+          If you believe a minor has an account with us, write to{' '}
           <a className="text-brand hover:text-brand-strong" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>{' '}
@@ -797,61 +564,34 @@ export function PrivacyPolicyPage() {
 
       {/* ----------------------------------------------------------------- 11 */}
       <LegalSection id="cookies" n={11} title="Cookies and browser storage">
-        <p>Here is everything the web app stores in your browser.</p>
-        <LegalTable head={['What', 'Where', 'Why']}>
-          <tr>
-            <td>
-              JWT access token and refresh token, your user profile, and your current workspace
-            </td>
-            <td>
-              <code className="font-mono text-sm">localStorage</code>, key{' '}
-              <code className="font-mono text-sm">wtsp-auth</code>
-            </td>
-            <td>
-              To keep you signed in between page loads. Cleared when you log out or clear site data.
-            </td>
-          </tr>
-          <tr>
-            <td>UI preferences, such as light or dark theme</td>
-            <td>
-              <code className="font-mono text-sm">localStorage</code>, same key
-            </td>
-            <td>To keep the interface the way you left it.</td>
-          </tr>
-        </LegalTable>
+        <p>
+          The web app stores two things in your browser's local storage: your sign-in tokens, so you
+          stay logged in between page loads, and interface preferences such as light or dark theme.
+          Both are cleared when you log out or clear site data.
+        </p>
         <LegalNote>
           <strong>No analytics cookies. No advertising cookies. No tracking pixels. None.</strong>{' '}
-          We do not run Google Analytics, a Meta Pixel, or any third-party tracker on this app or on
-          these legal pages. Nothing here follows you to other websites.
+          We run no third-party tracker on this app or on these legal pages. Nothing here follows
+          you to other websites.
         </LegalNote>
         <p>
-          The storage above is strictly necessary to run a logged-in session, which is why there is
-          no cookie banner to dismiss. If you block it, you cannot stay signed in.
+          That storage is strictly necessary to run a signed-in session, which is why there is no
+          cookie banner. If you block it, you cannot stay signed in.
         </p>
       </LegalSection>
 
       {/* ----------------------------------------------------------------- 12 */}
       <LegalSection id="changes" n={12} title="Changes to this policy">
         <p>
-          When this policy changes we update the "Last updated" date at the top of the page and
-          publish the new version here.
+          When this policy changes we update the "Last updated" date and publish the new version
+          here. Material changes — a new category of data, a new sub-processor, a new purpose, or a
+          longer retention period — are emailed to workspace admins at least{' '}
+          <strong>14 days</strong> before they take effect. Minor clarifications take effect on
+          publication.
         </p>
-        <LegalList>
-          <li>
-            <strong>Material changes</strong> — a new category of data, a new sub-processor, a new
-            purpose, or a longer retention period — are emailed to workspace admins at least{' '}
-            <strong>14 days</strong> before they take effect, and shown as a notice in the app.
-          </li>
-          <li>
-            <strong>Minor changes</strong> — wording, clarifications, corrected contact details —
-            take effect when published.
-          </li>
-        </LegalList>
         <p>
-          We do not apply material changes retroactively to data already collected without a lawful
-          basis for doing so. Continuing to use the service after a change takes effect means you
-          accept the updated policy; if you do not, you can close your account and ask us to delete
-          your data.
+          Continuing to use the service after a change takes effect means you accept the updated
+          policy. If you do not, you can close your account and ask us to delete your data.
         </p>
       </LegalSection>
 
@@ -859,8 +599,7 @@ export function PrivacyPolicyPage() {
       <LegalSection id="grievance" n={13} title="Grievance Officer">
         <p>
           As required by India's Digital Personal Data Protection Act, 2023 and the Information
-          Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or
-          Information) Rules, 2011, we have appointed a Grievance Officer. Write to them about
+          Technology Rules, 2011, we have appointed a Grievance Officer. Write to them about
           anything to do with your data or this policy.
         </p>
         <div className="dc-card-pad">
@@ -889,11 +628,6 @@ export function PrivacyPolicyPage() {
               )
             </dd>
 
-            <dt className="text-sm font-medium text-ink-3">Phone</dt>
-            <dd className="text-md text-ink">
-              <Fill>{CONTACT_PHONE_FILL}</Fill>
-            </dd>
-
             <dt className="text-sm font-medium text-ink-3">Postal address</dt>
             <dd className="text-md text-ink">
               <address className="not-italic leading-relaxed">
@@ -908,35 +642,32 @@ export function PrivacyPolicyPage() {
             <dt className="text-sm font-medium text-ink-3">Response timeline</dt>
             <dd className="text-md text-ink">
               Acknowledged within {GRIEVANCE_OFFICER.acknowledgeHours} hours; resolved within{' '}
-              {GRIEVANCE_OFFICER.responseDays} days of receipt.
+              {GRIEVANCE_OFFICER.responseDays} days.
             </dd>
           </dl>
         </div>
         <p>
           If you are not satisfied with the outcome, you may complain to the Data Protection Board
-          of India under the DPDP Act, 2023.
+          of India.
         </p>
       </LegalSection>
 
       {/* ----------------------------------------------------------------- 14 */}
-      <LegalSection id="governing-law" n={14} title="Governing law and jurisdiction">
+      <LegalSection id="governing-law" n={14} title="Governing law">
         <p>
           This policy is governed by the laws of India, including the Digital Personal Data
-          Protection Act, 2023, the Information Technology Act, 2000 and the rules made under them.
-        </p>
-        <p>
-          The courts at Mumbai, Maharashtra, India have exclusive jurisdiction over any dispute
-          arising out of this policy, and you and we submit to that jurisdiction.
+          Protection Act, 2023 and the Information Technology Act, 2000. The courts at Mumbai,
+          Maharashtra have exclusive jurisdiction.
         </p>
       </LegalSection>
 
       {/* ----------------------------------------------------------------- 15 */}
-      <LegalSection id="contact" n={15} title="Contact us, and dates">
+      <LegalSection id="contact" n={15} title="Contact and dates">
         <div className="dc-card-pad">
           <dl className="grid gap-3 sm:grid-cols-[10rem_1fr]">
             <dt className="text-sm font-medium text-ink-3">Operator</dt>
             <dd className="text-md text-ink">
-              {LEGAL_ENTITY} <Fill>{LEGAL_ENTITY_SUFFIX_FILL}</Fill>
+              {LEGAL_ENTITY} — {LEGAL_ENTITY_DESCRIPTOR}
             </dd>
 
             <dt className="text-sm font-medium text-ink-3">Registered address</dt>
@@ -955,11 +686,6 @@ export function PrivacyPolicyPage() {
               <a className="text-brand hover:text-brand-strong" href={`mailto:${CONTACT_EMAIL}`}>
                 {CONTACT_EMAIL}
               </a>
-            </dd>
-
-            <dt className="text-sm font-medium text-ink-3">Phone</dt>
-            <dd className="text-md text-ink">
-              <Fill>{CONTACT_PHONE_FILL}</Fill>
             </dd>
 
             <dt className="text-sm font-medium text-ink-3">Effective date</dt>
