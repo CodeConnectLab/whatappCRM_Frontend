@@ -13,6 +13,9 @@ import { TeamPage } from './pages/TeamPage.tsx';
 import { TemplatesPage } from './pages/TemplatesPage.tsx';
 import { WalletPage } from './pages/WalletPage.tsx';
 import { ActivityPage } from './pages/ActivityPage.tsx';
+import { DataDeletionPage } from './pages/legal/DataDeletionPage.tsx';
+import { PrivacyPolicyPage } from './pages/legal/PrivacyPolicyPage.tsx';
+import { TermsPage } from './pages/legal/TermsPage.tsx';
 
 export default function App() {
   return (
@@ -22,6 +25,11 @@ export default function App() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* Public legal pages. These sit outside RequireAuth on purpose: Meta's app
+            review fetches them anonymously and a redirect to /login fails review. */}
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/data-deletion" element={<DataDeletionPage />} />
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
