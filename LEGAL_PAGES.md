@@ -24,21 +24,35 @@ They render outside `RequireAuth` (see `src/App.tsx`). Content lives in
 
 2. Bump `EFFECTIVE_DATE` and `LAST_UPDATED` in `legalConfig.ts`.
 
-3. **Configure SPA fallback on the web server.** This is the one thing that
-   fails Meta review silently. A hard load of
-   `https://wtsp.codeconnect.in/privacy` must return HTTP 200 with the app
-   shell — not 404, and not a redirect to `/`.
+3. **SPA fallback must be configured on the host.** This is the one thing that
+   fails Meta review silently, and it is what produced a Vercel 404 on
+   `/privacy` the first time these pages went out.
 
-   nginx:
+   This project deploys to **Vercel**, which does not add an SPA fallback for
+   Vite projects on its own: a request for `/privacy` finds no file at that
+   path and Vercel serves its own 404 before the app ever loads. `vercel.json`
+   in the repo root fixes it:
+
+   ```json
+   {
+     "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+   }
+   ```
+
+   Vercel checks the filesystem before applying rewrites, so `/robots.txt`,
+   `/sitemap.xml` and hashed assets are still served as real files. Do not
+   replace this with a `redirects` entry — a 301/302 to `/` also fails review.
+
+   Other hosts, for reference:
 
    ```nginx
+   # nginx
    location / {
      try_files $uri $uri/ /index.html;
    }
    ```
 
    Netlify — `public/_redirects`: `/*  /index.html  200`
-   Vercel — `vercel.json` rewrite of `/(.*)` to `/index.html`
    Apache — `FallbackResource /index.html`
 
 4. Verify all three, unauthenticated, from outside your network:
