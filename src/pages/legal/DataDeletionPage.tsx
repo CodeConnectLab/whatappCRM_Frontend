@@ -14,6 +14,7 @@ import {
   GRIEVANCE_OFFICER,
   LAST_UPDATED,
   LEGAL_ENTITY,
+  LEGAL_ENTITY_DESCRIPTOR,
   PRODUCT_NAME,
   RETENTION,
 } from './legalConfig.ts';
@@ -66,9 +67,8 @@ export function DataDeletionPage() {
           </Step>
           <Step n={2} title="Disconnect your Meta and Twilio credentials">
             <p>
-              Go to <strong>Settings</strong> and remove the saved Meta credentials (and Twilio, if
-              used). They are erased from our database at once. You can also revoke our access from
-              your own Meta Business Manager, under Business Settings &rarr; Apps.
+              In <strong>Settings</strong>, remove the saved credentials. They are erased from our
+              database at once. You can also revoke our access from your own Meta Business Manager.
             </p>
           </Step>
           <Step n={3} title="Email us to close the workspace">
@@ -77,25 +77,22 @@ export function DataDeletionPage() {
               <a className="text-brand hover:text-brand-strong" href={`mailto:${CONTACT_EMAIL}`}>
                 {CONTACT_EMAIL}
               </a>{' '}
-              from your registered admin email address, with the subject{' '}
-              <strong>"Delete my workspace"</strong>. Include your workspace / company name and the
-              WhatsApp Business phone number connected to it.
+              from your registered admin email, with the subject{' '}
+              <strong>"Delete my workspace"</strong>. Include your workspace name and the WhatsApp
+              Business number connected to it.
             </p>
           </Step>
           <Step n={4} title="We confirm, then delete">
             <p>
-              We verify the request came from a workspace admin, confirm by email, and then delete.
-              Deletion completes within{' '}
-              <strong>{RETENTION.deletionSlaDays} days</strong> of confirmation, and in every case
-              within {RETENTION.conversationDaysAfterClosure} days of the account closing. You get a
-              written confirmation when it is done.
+              We verify the request came from a workspace admin and delete within{' '}
+              <strong>{RETENTION.deletionSlaDays} days</strong> of confirmation. You get written
+              confirmation when it is done.
             </p>
           </Step>
         </ol>
         <p>
-          Deleting individual records instead of the whole workspace? You can delete a single
-          contact or chat yourself from the app, at any time. That removes it from our live database
-          immediately.
+          You can also delete a single contact or chat yourself from the app at any time. That
+          removes it from our live database immediately.
         </p>
       </LegalSection>
 
@@ -103,157 +100,96 @@ export function DataDeletionPage() {
       <LegalSection id="end-consumer" n={2} title="If you messaged a business on WhatsApp">
         <p>
           You are not our user. A business you contacted uses our software to read and reply to your
-          messages, and that business — not us — decides what to keep. You have two routes, and the
-          first is faster.
+          messages, and that business — not us — decides what to keep. You have two routes.
         </p>
 
         <LegalSubhead>Route A — ask the business directly (fastest)</LegalSubhead>
         <p>
           Message the business on the same WhatsApp number you used, or email it, and ask it to
-          delete your chat history and contact record. It can do that itself, immediately, from its
-          own inbox. It is also the party legally responsible for your data.
+          delete your chat history and contact record. It can do that itself, immediately, and it is
+          the party legally responsible for your data.
         </p>
 
         <LegalSubhead>Route B — write to us</LegalSubhead>
         <p>
-          If the business does not respond, or you would rather come to us, email{' '}
+          If the business does not respond, email{' '}
           <a className="text-brand hover:text-brand-strong" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>{' '}
-          with the subject <strong>"Data deletion request"</strong>.
+          with the subject <strong>"Data deletion request"</strong> and include:
         </p>
-        <ol className="flex flex-col gap-4">
-          <Step n={1} title="Tell us who you are and what to delete">
-            <p>Include all of the following, or we may not be able to find your records:</p>
-            <LegalList>
-              <li>
-                <strong>The WhatsApp phone number you messaged from</strong>, in full international
-                format (for example +91 98765 43210). This is how we locate your records.
-              </li>
-              <li>
-                <strong>The business you contacted</strong> — its name, or the WhatsApp number you
-                messaged.
-              </li>
-              <li>
-                <strong>What you want deleted</strong> — your whole conversation history, your
-                contact record, or both.
-              </li>
-              <li>
-                <strong>Roughly when</strong> you contacted the business, if you remember. It helps
-                us find the right workspace.
-              </li>
-            </LegalList>
-            <p>
-              Do not send us ID documents, passwords, or payment details. We do not need them and
-              will not keep them.
-            </p>
-          </Step>
-          <Step n={2} title="We acknowledge and identify the workspace">
-            <p>
-              We acknowledge within {GRIEVANCE_OFFICER.acknowledgeHours} hours, find the business
-              whose workspace holds your data, and pass your request to it. We may ask you one
-              follow-up question to confirm it is your number.
-            </p>
-          </Step>
-          <Step n={3} title="The business instructs, we delete">
-            <p>
-              As the data processor we act on the controlling business's instruction. We follow up
-              if it does not respond. We complete deletion and write back to you within{' '}
-              <strong>{RETENTION.deletionSlaDays} days</strong> of receiving your request, telling
-              you what was deleted or why it was not.
-            </p>
-          </Step>
-        </ol>
+        <LegalList>
+          <li>
+            <strong>The WhatsApp number you messaged from</strong>, in full international format
+            (for example +91 98765 43210). This is how we locate your records.
+          </li>
+          <li>
+            <strong>The business you contacted</strong> — its name, or the WhatsApp number you
+            messaged.
+          </li>
+          <li>
+            <strong>What you want deleted</strong> — your conversation history, your contact record,
+            or both.
+          </li>
+        </LegalList>
         <p>
-          Deleting your data here does <strong>not</strong> delete messages stored on your own
-          phone, or on the business's other systems, or anything WhatsApp itself holds.
+          Please do not send ID documents, passwords or payment details. We do not need them and
+          will not keep them.
+        </p>
+        <p>
+          We acknowledge within {GRIEVANCE_OFFICER.acknowledgeHours} hours, identify the business
+          whose workspace holds your data, and pass your request to it. As the data processor we act
+          on that business's instruction. We complete deletion and write back to you within{' '}
+          <strong>{RETENTION.deletionSlaDays} days</strong>, telling you what was deleted or why it
+          was not.
+        </p>
+        <p>
+          Deleting your data here does not delete messages stored on your own phone, on the
+          business's other systems, or anything WhatsApp itself holds.
         </p>
       </LegalSection>
 
       {/* ------------------------------------------------------------------ 3 */}
       <LegalSection id="what-is-deleted" n={3} title="What gets deleted, and what is kept">
-        <LegalTable head={['Data', 'Deleted?', 'Detail']}>
+        <LegalTable head={['Data', 'Outcome']}>
           <tr>
             <td>Chat threads and message content</td>
             <td>
               <span className="dc-badge dc-badge-brand">Deleted</span>
             </td>
-            <td>Text, captions, locations, contact cards, reactions — all removed.</td>
           </tr>
           <tr>
-            <td>Media files (images, video, audio, documents)</td>
+            <td>Media files — images, video, audio, documents</td>
             <td>
               <span className="dc-badge dc-badge-brand">Deleted</span>
             </td>
-            <td>Removed from object storage along with their identifiers.</td>
           </tr>
           <tr>
-            <td>Contact records, tags and metadata</td>
+            <td>Contact records, tags and ad-attribution data</td>
             <td>
               <span className="dc-badge dc-badge-brand">Deleted</span>
             </td>
-            <td>Including name, phone number and email.</td>
           </tr>
           <tr>
-            <td>Ad-attribution data (ctwa_clid, ad IDs, ad content)</td>
+            <td>User accounts, workspace settings and connected credentials</td>
             <td>
-              <span className="dc-badge dc-badge-brand">Deleted</span>
-            </td>
-            <td>Deleted with the conversation it was attached to.</td>
-          </tr>
-          <tr>
-            <td>Business user accounts and workspace settings</td>
-            <td>
-              <span className="dc-badge dc-badge-brand">Deleted</span>
-            </td>
-            <td>Workspace deletion only.</td>
-          </tr>
-          <tr>
-            <td>Connected credentials (Meta, Twilio, CRM)</td>
-            <td>
-              <span className="dc-badge dc-badge-brand">Deleted</span>
-            </td>
-            <td>Erased as soon as you remove them in Settings. We keep no copy.</td>
-          </tr>
-          <tr>
-            <td>Server and webhook logs</td>
-            <td>
-              <span className="dc-badge">Expires</span>
-            </td>
-            <td>
-              Deleted automatically after {RETENTION.serverLogDays} days. Not searchable by phone
-              number, so they are aged out rather than individually purged.
+              <span className="dc-badge dc-badge-brand">Deleted</span> on workspace deletion
             </td>
           </tr>
           <tr>
-            <td>Encrypted backups</td>
+            <td>Server logs and encrypted backups</td>
             <td>
-              <span className="dc-badge">Expires</span>
-            </td>
-            <td>
-              Rotated out within {RETENTION.backupDays} days. Deleted data is never restored into
-              the live service.
+              <span className="dc-badge">Expires</span> — logs after {RETENTION.serverLogDays} days,
+              backups within {RETENTION.backupDays} days. Deleted data is never restored into the
+              live service.
             </td>
           </tr>
           <tr>
-            <td>Billing records, invoices, credit ledger</td>
+            <td>Billing records, invoices and the credit ledger</td>
             <td>
-              <span className="dc-badge dc-badge-warn">Retained</span>
-            </td>
-            <td>
-              Kept {RETENTION.billingYears} years. Indian tax and accounting law requires it, so we
-              cannot delete these on request. They contain workspace and payment records, not
+              <span className="dc-badge dc-badge-warn">Retained</span> {RETENTION.billingYears}{' '}
+              years, as Indian tax law requires. These hold workspace and payment records, not
               conversation content.
-            </td>
-          </tr>
-          <tr>
-            <td>Records needed for a legal claim or a lawful order</td>
-            <td>
-              <span className="dc-badge dc-badge-warn">Retained</span>
-            </td>
-            <td>
-              Only where a live dispute, investigation or binding order requires it, and only for as
-              long as that lasts.
             </td>
           </tr>
         </LegalTable>
@@ -301,7 +237,9 @@ export function DataDeletionPage() {
             </dd>
 
             <dt className="text-sm font-medium text-ink-3">Operator</dt>
-            <dd className="text-md text-ink">{LEGAL_ENTITY}, India</dd>
+            <dd className="text-md text-ink">
+              {LEGAL_ENTITY} — {LEGAL_ENTITY_DESCRIPTOR}
+            </dd>
 
             <dt className="text-sm font-medium text-ink-3">Effective date</dt>
             <dd className="text-md text-ink">{EFFECTIVE_DATE}</dd>

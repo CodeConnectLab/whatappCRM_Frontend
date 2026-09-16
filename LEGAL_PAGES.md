@@ -14,13 +14,11 @@ They render outside `RequireAuth` (see `src/App.tsx`). Content lives in
 
 ## Before submitting to Meta
 
-1. Fill in every remaining placeholder:
-
-   ```
-   grep -rn "FILL:" src/pages/legal
-   ```
-
-   Unfilled values render as a yellow `[FILL: ...]` badge on the live page.
+1. Check the facts still hold. Everything operator-supplied lives in
+   `src/pages/legal/legalConfig.ts` — entity, address, grievance officer,
+   retention windows, infrastructure, SLA. The infrastructure values match the
+   backend's `SETUP_GUIDE.md` (AWS in ap-south-1, MongoDB Atlas in Mumbai,
+   Vercel serving the web app); if the deployment moves, update that file.
 
 2. Bump `EFFECTIVE_DATE` and `LAST_UPDATED` in `legalConfig.ts`.
 

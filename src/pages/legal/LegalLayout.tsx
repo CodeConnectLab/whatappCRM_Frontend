@@ -4,18 +4,6 @@ import { IconMoon, IconSun, LogoMark } from '../../components/Icons.tsx';
 import { useAuthStore } from '../../store/authStore.ts';
 import { LAST_UPDATED, LEGAL_ROUTES, PRODUCT_NAME } from './legalConfig.ts';
 
-/**
- * A value the operator still has to supply. Rendered loudly on purpose so an
- * unfilled placeholder can never quietly ship to Meta's review team.
- */
-export function Fill({ children }: { children: string }) {
-  return (
-    <mark className="rounded-[4px] border border-warn-line bg-warn-soft px-1 py-0.5 font-mono text-xs font-medium text-warn">
-      [FILL: {children}]
-    </mark>
-  );
-}
-
 /** A numbered top-level section with a stable anchor id for the table of contents. */
 export function LegalSection({
   id,
