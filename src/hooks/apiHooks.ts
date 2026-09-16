@@ -16,6 +16,8 @@ import type {
   ContactImportResult,
   MessageRow,
   MetaWhatsappConfig,
+  CrmBridgeConfig,
+  CrmBridgePushMode,
   Paginated,
   TeamMember,
   Template,
@@ -163,6 +165,57 @@ export function useUpsertMetaWhatsappConfigMutation() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['meta-whatsapp-config', companyId] });
       void qc.invalidateQueries({ queryKey: ['workspace-summary', companyId] });
+    },
+  });
+}
+
+export function useCrmBridgeQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  const workspaceRole = useAuthStore((s) => s.workspaceRole);
+  return useQuery({
+    queryKey: ['crm-bridge', companyId],
+    enabled: Boolean(companyId) && workspaceRole === 'company_admin',
+    queryFn: async () => (await api.get<CrmBridgeConfig>('/api/crm/bridge')).data,
+  });
+}
+
+export function useUpsertCrmBridgeMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async (body: {
+      enabled?: boolean;
+      crmBaseUrl?: string;
+      crmApiKey?: string;
+      pushMode?: CrmBridgePushMode;
+      leadSourceLabel?: string;
+    }) => (await api.post<CrmBridgeConfig>('/api/crm/bridge', body)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['crm-bridge', companyId] });
+    },
+  });
+}
+
+/** Sends a throwaway lead so credentials can be proven before real traffic depends on them. */
+export function useTestCrmBridgeMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async () =>
+      (await api.post<{ ok: boolean; message: string }>('/api/crm/bridge/test')).data,
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['crm-bridge', companyId] });
+    },
+  });
+}
+
+export function useDisconnectCrmBridgeMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async () => (await api.delete<{ ok: boolean }>('/api/crm/bridge')).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['crm-bridge', companyId] });
     },
   });
 }
