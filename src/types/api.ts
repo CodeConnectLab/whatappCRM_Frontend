@@ -169,3 +169,21 @@ export type TeamMember = {
   role: string;
   userId?: { email?: string; name?: string };
 };
+
+export type CrmBridgePushMode = 'ad_only' | 'all_inbound';
+
+/** Bridge that forwards WhatsApp leads into the client's own CRM. */
+export type CrmBridgeConfig = {
+  enabled: boolean;
+  /** Both the base URL and an API key are saved. */
+  configured: boolean;
+  crmBaseUrl?: string;
+  apiKeyConfigured: boolean;
+  pushMode: CrmBridgePushMode;
+  leadSourceLabel?: string;
+  lastPushAt?: string;
+  lastPushStatus?: string;
+  lastPushError?: string;
+  totalPushed: number;
+  totalFailed: number;
+};

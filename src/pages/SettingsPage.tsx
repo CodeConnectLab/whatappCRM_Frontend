@@ -13,15 +13,17 @@ import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
 import { MetaWebhookStatusBanner } from '../components/settings/MetaWebhookStatusBanner.tsx';
 import { MetaSetupStatus } from '../components/settings/MetaSetupStatus.tsx';
 import { TwilioSettingsPanels } from '../components/settings/TwilioSettingsPanels.tsx';
+import { CrmBridgePanel } from '../components/settings/CrmBridgePanel.tsx';
 import { SHOW_TWILIO_UI } from '../config/features.ts';
 import { visibleWhatsappSenders } from '../lib/visibleSenders.ts';
 import { CardNote, PageHeader, WorkspaceCard } from '../components/workspace/WorkspaceSurface.tsx';
 
-type SettingsTab = 'channel' | 'senders' | 'company';
+type SettingsTab = 'channel' | 'senders' | 'crm' | 'company';
 
 const TABS: { key: SettingsTab; name: string; hint: string }[] = [
   { key: 'channel', name: 'WhatsApp channel', hint: 'Meta' },
   { key: 'senders', name: 'Senders', hint: 'Numbers' },
+  { key: 'crm', name: 'CRM bridge', hint: 'Leads' },
   { key: 'company', name: 'Company', hint: 'Profile' },
 ];
 
@@ -468,6 +470,8 @@ export function SettingsPage() {
           ) : null}
 
           {/* ------------------------------------------------------ company */}
+          {tab === 'crm' ? <CrmBridgePanel canEdit={workspaceRole === 'company_admin'} /> : null}
+
           {tab === 'company' ? (
             canManage ? (
               <WorkspaceCard title="Company profile">
