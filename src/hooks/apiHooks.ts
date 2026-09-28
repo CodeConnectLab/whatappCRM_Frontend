@@ -11,6 +11,7 @@ import type {
   AssignmentCandidate,
   AutoResponseRule,
   Campaign,
+  ChatDetail,
   ChatNote,
   ChatRow,
   CompanyRow,
@@ -26,6 +27,7 @@ import type {
   MediaKind,
   Paginated,
   Product,
+  QuickReply,
   TeamMember,
   Template,
   TemplateCategory,
@@ -316,6 +318,63 @@ export function useDistributeLeadsMutation() {
       (await api.post<{ assigned: number }>('/api/leads/distribute')).data,
     onSuccess: () => invalidateLeadViews(qc, companyId),
   });
+}
+
+/** The details rail's whole payload: chat, service window, groups and activity. */
+export function useChatDetailQuery(chatId: string | null) {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['chat-detail', companyId, chatId],
+    enabled: Boolean(companyId && chatId),
+    queryFn: async () => (await api.get<ChatDetail>(`/api/chats/${chatId}`)).data,
+    // The 24-hour window counts down, so a stale payload would show a window that has
+    // already closed. A minute is close enough for a countdown shown to the minute.
+    refetchInterval: 60_000,
+  });
+}
+
+export function useUpdateContactTagsMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({ chatId, tags }: { chatId: string; tags: string[] }) =>
+      (await api.patch<{ tags: string[] }>(`/api/chats/${chatId}/tags`, { tags })).data,
+    onSuccess: (_d, { chatId }) => {
+      void qc.invalidateQueries({ queryKey: ['chat-detail', companyId, chatId] });
+      void qc.invalidateQueries({ queryKey: ['chats', companyId] });
+    },
+  });
+}
+
+export function useQuickRepliesQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['quick-replies', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => (await api.get<QuickReply[]>('/api/quick-replies')).data,
+  });
+}
+
+export function useQuickReplyMutations() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  const invalidate = () => void qc.invalidateQueries({ queryKey: ['quick-replies', companyId] });
+
+  const create = useMutation({
+    mutationFn: async (body: { title: string; body: string; shortcut?: string }) =>
+      (await api.post<QuickReply>('/api/quick-replies', body)).data,
+    onSuccess: invalidate,
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; title?: string; body?: string; shortcut?: string | null }) =>
+      (await api.patch<QuickReply>(`/api/quick-replies/${id}`, body)).data,
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/api/quick-replies/${id}`)).data,
+    onSuccess: invalidate,
+  });
+  return { create, update, remove };
 }
 
 export function useChatNotesQuery(chatId: string | null) {
@@ -685,20 +744,29 @@ export function useSendChatMessageMutation() {
       chatId,
       body,
       mediaId,
+      templateId,
+      quickReplyId,
     }: {
       chatId: string;
       body?: string;
       mediaId?: string;
+      /** Approved template — the only thing deliverable once the window has closed. */
+      templateId?: string;
+      quickReplyId?: string;
     }) =>
       (
         await api.post<MessageRow>(`/api/chats/${chatId}/messages`, {
           ...(body ? { body } : {}),
           ...(mediaId ? { mediaId } : {}),
+          ...(templateId ? { templateId } : {}),
+          ...(quickReplyId ? { quickReplyId } : {}),
         })
       ).data,
     onSuccess: (_data, { chatId }) => {
       void qc.invalidateQueries({ queryKey: ['messages', companyId, chatId] });
       void qc.invalidateQueries({ queryKey: ['chats', companyId] });
+      void qc.invalidateQueries({ queryKey: ['chat-detail', companyId, chatId] });
+      void qc.invalidateQueries({ queryKey: ['quick-replies', companyId] });
     },
   });
 }

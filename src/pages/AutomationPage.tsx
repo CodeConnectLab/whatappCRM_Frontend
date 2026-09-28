@@ -4,6 +4,8 @@ import {
   useAutoResponsesQuery,
   useProductMutations,
   useProductsQuery,
+  useQuickRepliesQuery,
+  useQuickReplyMutations,
   useTemplatesQuery,
   useWhatsappNumbersQuery,
   type AutoResponseInput,
@@ -22,7 +24,7 @@ import {
   WorkspaceAlertError,
   WorkspaceCard,
 } from '../components/workspace/WorkspaceSurface.tsx';
-import type { AutoResponseRule, AutoResponseTrigger, Product } from '../types/api.ts';
+import type { AutoResponseRule, AutoResponseTrigger, Product, QuickReply } from '../types/api.ts';
 
 const TRIGGER_LABELS: Record<AutoResponseTrigger, string> = {
   first_inbound: 'First message from a new lead',
@@ -204,6 +206,86 @@ function ProductForm(props: { product?: Product; onDone: () => void }) {
       <div className="flex gap-2">
         <button type="submit" disabled={pending} className="dc-btn dc-btn-primary flex-1">
           {pending ? 'Saving…' : p ? 'Save product' : 'Create product'}
+        </button>
+        <button type="button" className="dc-btn" onClick={props.onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ----------------------------------------------------------- quick replies */
+
+function QuickReplyForm(props: { reply?: QuickReply; onDone: () => void }) {
+  const { create, update } = useQuickReplyMutations();
+  const r = props.reply;
+
+  const [title, setTitle] = useState(r?.title ?? '');
+  const [body, setBody] = useState(r?.body ?? '');
+  const [shortcut, setShortcut] = useState(r?.shortcut ?? '');
+  const [err, setErr] = useState<string | null>(null);
+  const pending = create.isPending || update.isPending;
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    try {
+      if (r) await update.mutateAsync({ id: r._id, title, body, shortcut: shortcut || null });
+      else await create.mutateAsync({ title, body, ...(shortcut ? { shortcut } : {}) });
+      props.onDone();
+    } catch (er) {
+      setErr(apiErrorMessage(er));
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5 p-4">
+      {err ? <WorkspaceAlertError>{err}</WorkspaceAlertError> : null}
+
+      <WorkspaceAlert tone="neutral">
+        A saved reply is your own text, not a WhatsApp template — it needs no Meta
+        approval, but it only reaches a contact within 24 hours of their last message.
+      </WorkspaceAlert>
+
+      <label className="dc-label">
+        <span className="dc-label-text">Title</span>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="dc-input"
+          placeholder="Bulk pricing"
+          required
+        />
+      </label>
+
+      <label className="dc-label">
+        <span className="dc-label-text">Message</span>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={5}
+          className="dc-textarea"
+          placeholder="Bulk orders above 50 units get 25%. Shall I share the price list?"
+          required
+        />
+      </label>
+
+      <label className="dc-label">
+        <span className="dc-label-text">Shortcut (optional)</span>
+        <input
+          value={shortcut}
+          onChange={(e) => setShortcut(e.target.value)}
+          className="dc-input font-mono"
+          placeholder="price"
+          maxLength={40}
+        />
+        <span className="text-xs text-ink-4">Shown in the composer's picker as /price.</span>
+      </label>
+
+      <div className="flex gap-2">
+        <button type="submit" disabled={pending} className="dc-btn dc-btn-primary flex-1">
+          {pending ? 'Saving…' : r ? 'Save reply' : 'Create reply'}
         </button>
         <button type="button" className="dc-btn" onClick={props.onDone}>
           Cancel
@@ -674,7 +756,7 @@ function AutoResponseForm(props: { rule?: AutoResponseRule; onDone: () => void }
 
 /* ------------------------------------------------------------------- page */
 
-type Tab = 'responses' | 'products';
+type Tab = 'responses' | 'products' | 'quick';
 
 function Drawer(props: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -705,12 +787,15 @@ export function AutomationPage() {
   const [tab, setTab] = useState<Tab>('responses');
   const [editingRule, setEditingRule] = useState<AutoResponseRule | 'new' | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | 'new' | null>(null);
+  const [editingQuick, setEditingQuick] = useState<QuickReply | 'new' | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const rulesQ = useAutoResponsesQuery();
   const productsQ = useProductsQuery();
+  const quickQ = useQuickRepliesQuery();
   const { update: updateRule, remove: removeRule } = useAutoResponseMutations();
   const { remove: removeProduct } = useProductMutations();
+  const { remove: removeQuick } = useQuickReplyMutations();
 
   const productNames = useMemo(
     () => new Map((productsQ.data ?? []).map((p) => [p._id, p.name])),
@@ -748,6 +833,7 @@ export function AutomationPage() {
 
   const rules = rulesQ.data ?? [];
   const products = productsQ.data ?? [];
+  const quickReplies = quickQ.data ?? [];
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -758,10 +844,18 @@ export function AutomationPage() {
           <button
             type="button"
             className="dc-btn dc-btn-primary"
-            onClick={() => (tab === 'responses' ? setEditingRule('new') : setEditingProduct('new'))}
+            onClick={() => {
+              if (tab === 'responses') setEditingRule('new');
+              else if (tab === 'products') setEditingProduct('new');
+              else setEditingQuick('new');
+            }}
           >
             <IconPlus className="h-3.5 w-3.5" />
-            {tab === 'responses' ? 'New auto-response' : 'New product'}
+            {tab === 'responses'
+              ? 'New auto-response'
+              : tab === 'products'
+                ? 'New product'
+                : 'New saved reply'}
           </button>
         }
       />
@@ -772,6 +866,7 @@ export function AutomationPage() {
         items={[
           { key: 'responses' as Tab, label: 'Auto responses', count: rules.length },
           { key: 'products' as Tab, label: 'Products', count: products.length },
+          { key: 'quick' as Tab, label: 'Saved replies', count: quickReplies.length },
         ]}
         value={tab}
         onChange={setTab}
@@ -904,7 +999,7 @@ export function AutomationPage() {
             </div>
           )}
         </WorkspaceCard>
-      ) : (
+      ) : tab === 'products' ? (
         <WorkspaceCard flush>
           {productsQ.isLoading ? (
             <div className="p-4">
@@ -994,7 +1089,99 @@ export function AutomationPage() {
             </div>
           )}
         </WorkspaceCard>
+      ) : (
+        <WorkspaceCard flush>
+          {quickQ.isLoading ? (
+            <div className="p-4">
+              <CardNote>Loading…</CardNote>
+            </div>
+          ) : !quickReplies.length ? (
+            <EmptyState
+              title="No saved replies yet"
+              description="Answers your agents type over and over — pricing, timings, address — kept one keystroke away in the composer."
+              action={
+                <button
+                  type="button"
+                  className="dc-btn dc-btn-primary"
+                  onClick={() => setEditingQuick('new')}
+                >
+                  <IconBolt className="h-3.5 w-3.5" />
+                  Add the first reply
+                </button>
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="dc-table dc-table-hover min-w-[680px]">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="pl-4">Reply</th>
+                    <th>Shortcut</th>
+                    <th>Used</th>
+                    <th className="pr-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quickReplies.map((q) => (
+                    <tr key={q._id}>
+                      <td className="pl-4">
+                        <div className="flex min-w-0 flex-col gap-px">
+                          <span className="truncate font-medium text-ink">{q.title}</span>
+                          <span className="line-clamp-1 max-w-[380px] text-xs text-ink-4">
+                            {q.body}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="font-mono text-sm text-ink-2">
+                          {q.shortcut ? `/${q.shortcut}` : '—'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="tabular-nums text-ink">{q.useCount ?? 0}</span>
+                      </td>
+                      <td className="pr-4">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            type="button"
+                            className="dc-btn dc-btn-xs"
+                            onClick={() => setEditingQuick(q)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="dc-btn dc-btn-xs dc-btn-danger"
+                            disabled={removeQuick.isPending}
+                            onClick={() => {
+                              if (!window.confirm(`Delete “${q.title}”?`)) return;
+                              void run(() => removeQuick.mutateAsync(q._id));
+                            }}
+                          >
+                            <IconTrash className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </WorkspaceCard>
       )}
+
+      {editingQuick ? (
+        <Drawer
+          title={editingQuick === 'new' ? 'New saved reply' : 'Edit saved reply'}
+          onClose={() => setEditingQuick(null)}
+        >
+          <QuickReplyForm
+            {...(editingQuick !== 'new' ? { reply: editingQuick } : {})}
+            onDone={() => setEditingQuick(null)}
+          />
+        </Drawer>
+      ) : null}
 
       {editingRule ? (
         <Drawer

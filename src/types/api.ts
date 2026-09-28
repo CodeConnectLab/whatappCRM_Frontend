@@ -170,6 +170,8 @@ export type ChatRow = {
   firstInboundMessage?: string;
   firstInboundAt?: string;
   lastAgentReplyAt?: string;
+  /** Contact's last message — the start of the 24-hour free-form window. */
+  lastInboundAt?: string;
   crmSyncStatus?: string;
   createdAt?: string;
 };
@@ -197,6 +199,42 @@ export type MessageRow = {
   senderUserId?: string;
   media?: MessageMedia;
   isAutomated?: boolean;
+};
+
+/** How much of WhatsApp's 24-hour free-form reply window is left. */
+export type ServiceWindow = {
+  /** False only when the window is provably shut. */
+  open: boolean;
+  /** False for conversations that predate window tracking — claim nothing then. */
+  known: boolean;
+  expiresAt: string | null;
+  minutesLeft: number;
+};
+
+export type ChatActivityRow = {
+  _id: string;
+  action: string;
+  meta?: Record<string, unknown>;
+  createdAt: string;
+  userId?: { name?: string; email?: string };
+};
+
+/** Everything the details rail needs for one conversation, in one call. */
+export type ChatDetail = {
+  chat: ChatRow;
+  serviceWindow: ServiceWindow;
+  groups: { _id: string; name: string }[];
+  activity: ChatActivityRow[];
+};
+
+/** Canned reply an agent drops into the composer. Ours, not a Meta template. */
+export type QuickReply = {
+  _id: string;
+  title: string;
+  body: string;
+  shortcut?: string;
+  mediaId?: string;
+  useCount?: number;
 };
 
 export type ChatNote = {

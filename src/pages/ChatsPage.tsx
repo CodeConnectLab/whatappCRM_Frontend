@@ -1,6 +1,7 @@
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import {
   FormEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -10,13 +11,17 @@ import {
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
+  IconBolt,
+  IconCheck,
   IconChevronDown,
+  IconClock,
   IconClose,
   IconInfo,
   IconPaperclip,
   IconPlus,
   IconSearch,
   IconSmile,
+  IconTemplate,
 } from '../components/Icons.tsx';
 import { WaOutboundTicks } from '../components/WaOutboundTicks.tsx';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
@@ -25,11 +30,18 @@ import { LeadDetailsPanel } from '../components/chat/LeadDetailsPanel.tsx';
 import { MessageAttachment } from '../components/chat/MessageAttachment.tsx';
 import { useSocket } from '../hooks/useSocket.ts';
 import {
+  useReassignLeadMutation,
+  useUpdateLeadStatusMutation,
   uploadChatAttachment,
+  useChatDetailQuery,
   useChatMessagesInfiniteQuery,
   useChatsQuery,
+  useLeadCountsQuery,
   useMarkChatReadMutation,
   useContactsQuery,
+  useQuickRepliesQuery,
+  useTeamQuery,
+  useTemplatesQuery,
   useSendChatMessageMutation,
   useStartChatMutation,
   type ChatFilters,
@@ -59,7 +71,37 @@ function formatDayLabel(iso: string): string {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-type ListFilter = 'all' | 'unread' | 'unassigned';
+/** The design's three views. Agents only ever see their own, so they get no tabs. */
+/** "3h 12m" / "48m" — the countdown the design shows above the composer. */
+function formatWindowLeft(minutes: number): string {
+  if (minutes <= 0) return '0m';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+/** Popover anchored to the composer bar, with a click-away layer behind it. */
+function Picker(props: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-20 cursor-default"
+        aria-label={`Close ${props.title}`}
+        onClick={props.onClose}
+      />
+      <div className="absolute bottom-[calc(100%+8px)] left-2 z-30 flex max-h-72 w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-card border border-line bg-surface shadow-modal">
+        <div className="shrink-0 border-b border-line-soft px-3 py-2 text-xs font-medium uppercase tracking-wide text-ink-4">
+          {props.title}
+        </div>
+        <div className="flex min-h-0 flex-col overflow-y-auto py-1">{props.children}</div>
+      </div>
+    </>
+  );
+}
+
+/** The design's three views. Agents only ever see their own, so they get no tabs. */
+type ListFilter = 'mine' | 'unassigned' | 'all';
 
 /** Attachment chosen in the composer, with its upload state. */
 type PendingAttachment = {
@@ -86,12 +128,18 @@ export function ChatsPage() {
   const workspaceRole = useAuthStore((s) => s.workspaceRole);
   const isAdmin = workspaceRole === 'company_admin';
 
-  const [listFilter, setListFilter] = useState<ListFilter>('all');
-  const chatFilters: ChatFilters = useMemo(
-    () => (listFilter === 'unassigned' ? { assigned: 'unassigned' } : {}),
-    [listFilter],
-  );
+  const [listFilter, setListFilter] = useState<ListFilter>('mine');
+  const chatFilters: ChatFilters = useMemo(() => ({ assigned: listFilter }), [listFilter]);
   const chatsQ = useChatsQuery(chatFilters);
+  const countsQ = useLeadCountsQuery();
+  const teamQ = useTeamQuery();
+
+  // "Mine" counts the leads still open with me, which the roster already computes —
+  // the workspace total from countsQ would be wrong on this pill for an admin.
+  const myLeadCount = useMemo(
+    () => (teamQ.data ?? []).find((m) => m.userId?._id === userId)?.openLeadCount,
+    [teamQ.data, userId],
+  );
   const msgQ = useChatMessagesInfiniteQuery(chatId || null);
   const sendM = useSendChatMessageMutation();
   const startChat = useStartChatMutation();
@@ -115,7 +163,14 @@ export function ChatsPage() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [listOpenMobile, setListOpenMobile] = useState(false);
 
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+
   const [draft, setDraft] = useState('');
+  /** Set when the draft came from a saved reply, so its usage counter can be bumped. */
+  const [usedQuickReplyId, setUsedQuickReplyId] = useState<string | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   // One attachment at a time: WhatsApp delivers a single media object per message, so
   // a multi-file picker would only be a promise the send could not keep.
@@ -205,6 +260,67 @@ export function ChatsPage() {
 
   const [sendErr, setSendErr] = useState<string | null>(null);
 
+  const openChat = useMemo(
+    () => (chatsQ.data ?? []).find((c) => c._id === chatId),
+    [chatsQ.data, chatId],
+  );
+
+  const detailQ = useChatDetailQuery(chatId || null);
+  const quickRepliesQ = useQuickRepliesQuery();
+  const templatesQ = useTemplatesQuery();
+  const reassign = useReassignLeadMutation();
+  const updateStatus = useUpdateLeadStatusMutation();
+
+  const serviceWindow = detailQ.data?.serviceWindow;
+  // Only a window we can prove is shut blocks the composer. An in-flight request, or a
+  // conversation older than this tracking, leaves the agent free to try — letting
+  // WhatsApp refuse is better than greying out the box on a guess.
+  const windowClosed = Boolean(serviceWindow?.known && !serviceWindow.open);
+  const windowOpen = !windowClosed;
+  /** True when the contact has never written, so only a template can open the chat. */
+  const neverMessaged = Boolean(serviceWindow?.known && !serviceWindow.expiresAt);
+  const isChatClosed = openChat?.status === 'won' || openChat?.status === 'lost';
+
+  const approvedTemplates = useMemo(
+    () => (templatesQ.data ?? []).filter((t) => t.status === 'APPROVED'),
+    [templatesQ.data],
+  );
+
+  async function onAssign(assignedTo: string | null) {
+    setSendErr(null);
+    setAssignOpen(false);
+    if (!chatId) return;
+    try {
+      await reassign.mutateAsync({ chatId, assignedTo });
+    } catch (er) {
+      setSendErr(apiErrorMessage(er));
+    }
+  }
+
+  async function onCloseChat(status: 'won' | 'lost') {
+    setSendErr(null);
+    setCloseOpen(false);
+    if (!chatId) return;
+    try {
+      await updateStatus.mutateAsync({ chatId, status });
+    } catch (er) {
+      setSendErr(apiErrorMessage(er));
+    }
+  }
+
+  async function onSendTemplate(templateId: string) {
+    setSendErr(null);
+    setTemplateOpen(false);
+    if (!chatId) return;
+    try {
+      await sendM.mutateAsync({ chatId, templateId });
+      setDraft('');
+      setAttachment(null);
+    } catch (er) {
+      setSendErr(apiErrorMessage(er));
+    }
+  }
+
   async function onStartChat(contactId: string) {
     setSendErr(null);
     try {
@@ -253,7 +369,8 @@ export function ChatsPage() {
 
   const attachmentReady = Boolean(attachment?.uploaded);
   const attachmentBusy = Boolean(attachment && !attachment.uploaded && !attachment.error);
-  const canSend = Boolean(chatId) && (Boolean(draft.trim()) || attachmentReady) && !attachmentBusy;
+  const canSend =
+    Boolean(chatId) && (Boolean(draft.trim()) || attachmentReady) && !attachmentBusy && windowOpen;
 
   const submitMessage = useCallback(async () => {
     setSendErr(null);
@@ -265,19 +382,25 @@ export function ChatsPage() {
       setSendErr(attachment.error ?? 'Attachment is still uploading');
       return;
     }
+    if (windowClosed) {
+      setSendErr('Free text will not reach this contact — send an approved template instead.');
+      return;
+    }
     try {
       await sendM.mutateAsync({
         chatId,
         ...(body ? { body } : {}),
         ...(mediaId ? { mediaId } : {}),
+        ...(usedQuickReplyId ? { quickReplyId: usedQuickReplyId } : {}),
       });
       setDraft('');
       setAttachment(null);
+      setUsedQuickReplyId(null);
       setEmojiOpen(false);
     } catch (er) {
       setSendErr(apiErrorMessage(er));
     }
-  }, [attachment, chatId, draft, sendM]);
+  }, [attachment, chatId, draft, sendM, windowClosed, usedQuickReplyId]);
 
   async function onSend(e: FormEvent) {
     e.preventDefault();
@@ -287,27 +410,25 @@ export function ChatsPage() {
   const allChats = useMemo(() => chatsQ.data ?? [], [chatsQ.data]);
   const unreadTotal = allChats.reduce((n, c) => n + (c.unreadCount ?? 0), 0);
 
+  // Scope is applied server-side; only the search box narrows further.
   const visibleChats = useMemo(() => {
     const q = listQuery.trim().toLowerCase();
+    if (!q) return allChats;
     return allChats.filter((c) => {
-      // 'unassigned' is a server-side filter; only 'unread' needs narrowing here.
-      if (listFilter === 'unread' && !(c.unreadCount ?? 0)) return false;
-      if (!q) return true;
       const hay = `${c.contactId?.name ?? ''} ${c.contactId?.phone ?? ''} ${c.lastMessagePreview ?? ''}`;
       return hay.toLowerCase().includes(q);
     });
-  }, [allChats, listFilter, listQuery]);
+  }, [allChats, listQuery]);
 
-  const openChat = allChats.find((c) => c._id === chatId);
-
-  // Arriving from the Leads page with ?chat=… while the list is narrowed to unassigned
-  // would leave the thread open but the details panel empty, because the selected chat
-  // is not in the fetched page. Widen the list instead of showing half a screen.
+  // Arriving from the Leads page with ?chat=… for someone else's lead would leave the
+  // thread open but the rail empty, because the selected chat is not in the fetched
+  // page. Widen to all chats instead of showing half a screen. Agents are pinned
+  // server-side, so this only ever helps an admin.
   useEffect(() => {
-    if (chatId && !openChat && listFilter === 'unassigned' && !chatsQ.isLoading) {
+    if (chatId && !openChat && isAdmin && listFilter !== 'all' && !chatsQ.isLoading) {
       setListFilter('all');
     }
-  }, [chatId, openChat, listFilter, chatsQ.isLoading]);
+  }, [chatId, openChat, isAdmin, listFilter, chatsQ.isLoading]);
 
   const openName = openChat?.contactId?.name || openChat?.contactId?.phone || 'Conversation';
   const openPhone = openChat?.contactId?.phone ?? '';
@@ -344,22 +465,20 @@ export function ChatsPage() {
             {newChatOpen ? <IconClose className="h-3.5 w-3.5" /> : <IconPlus className="h-3.5 w-3.5" />}
           </button>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setListFilter('all')}
-            className={`dc-pill ${listFilter === 'all' ? 'dc-pill-active' : ''}`}
-          >
-            All <span className="opacity-60 tabular-nums">{allChats.length}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setListFilter('unread')}
-            className={`dc-pill ${listFilter === 'unread' ? 'dc-pill-active' : ''}`}
-          >
-            Unread <span className="opacity-60 tabular-nums">{unreadTotal}</span>
-          </button>
-          {isAdmin ? (
+        {/* Agents are pinned to their own leads server-side, so the other two views
+            would only ever repeat "Mine" for them. */}
+        {isAdmin ? (
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setListFilter('mine')}
+              className={`dc-pill ${listFilter === 'mine' ? 'dc-pill-active' : ''}`}
+            >
+              Mine
+              {myLeadCount != null ? (
+                <span className="opacity-60 tabular-nums">{myLeadCount}</span>
+              ) : null}
+            </button>
             <button
               type="button"
               onClick={() => setListFilter('unassigned')}
@@ -367,9 +486,23 @@ export function ChatsPage() {
               title="Leads nobody owns yet"
             >
               Unassigned
+              {countsQ.data?.unassigned != null ? (
+                <span className="opacity-60 tabular-nums">{countsQ.data.unassigned}</span>
+              ) : null}
             </button>
-          ) : null}
-        </div>
+            <button
+              type="button"
+              onClick={() => setListFilter('all')}
+              className={`dc-pill ${listFilter === 'all' ? 'dc-pill-active' : ''}`}
+            >
+              All chats
+            </button>
+          </div>
+        ) : unreadTotal ? (
+          <span className="px-0.5 text-xs text-ink-4">
+            {unreadTotal} unread across your leads
+          </span>
+        ) : null}
       </div>
 
       {newChatOpen ? (
@@ -448,20 +581,20 @@ export function ChatsPage() {
                       </span>
                     ) : null}
                   </div>
-                  {/* Only admins see other people's leads, so the owner is only worth
-                      naming for them. */}
-                  {isAdmin ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-2xs text-ink-4">
-                        {c.assignedToUser?.name ?? c.assignedToUser?.email ?? 'Unassigned'}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-2xs text-ink-4">
+                      {!c.assignedTo
+                        ? 'Unassigned'
+                        : c.assignedTo === userId
+                          ? 'Assigned to you'
+                          : `Assigned to ${c.assignedToUser?.name ?? c.assignedToUser?.email ?? 'a teammate'}`}
+                    </span>
+                    {c.productName ? (
+                      <span className="ml-auto shrink-0 truncate text-2xs text-ink-4">
+                        {c.productName}
                       </span>
-                      {c.productName ? (
-                        <span className="ml-auto shrink-0 truncate text-2xs text-ink-4">
-                          {c.productName}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
               </button>
             );
@@ -504,7 +637,85 @@ export function ChatsPage() {
                   {openPhone ? `${openPhone} · ` : ''}WhatsApp
                 </span>
               </div>
-              <div className="ml-auto flex shrink-0 gap-1.5">
+              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                {isAdmin ? (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setAssignOpen((v) => !v)}
+                      className="dc-btn dc-btn-sm"
+                    >
+                      <span className="hidden sm:inline">Assign</span>
+                      <IconChevronDown className="h-3.5 w-3.5" />
+                    </button>
+                    {assignOpen ? (
+                      <>
+                        {/* Click-away layer; a menu that only closes on re-click is a trap
+                            on touch. */}
+                        <button
+                          type="button"
+                          className="fixed inset-0 z-20 cursor-default"
+                          aria-label="Close assign menu"
+                          onClick={() => setAssignOpen(false)}
+                        />
+                        <div className="absolute right-0 top-[calc(100%+6px)] z-30 flex w-[230px] flex-col overflow-hidden rounded-card border border-line bg-surface py-1 shadow-modal">
+                          <button
+                            type="button"
+                            className="px-3 py-2 text-left text-sm text-ink-3 hover:bg-line-soft"
+                            onClick={() => void onAssign(null)}
+                          >
+                            Unassign — back to the pool
+                          </button>
+                          <div className="my-1 h-px bg-line-soft" />
+                          {(teamQ.data ?? [])
+                            .filter((m) => m.userId)
+                            .map((m) => (
+                              <button
+                                key={m.userId!._id}
+                                type="button"
+                                className={`flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-line-soft ${
+                                  openChat?.assignedTo === m.userId!._id
+                                    ? 'font-semibold text-brand-ink'
+                                    : 'text-ink'
+                                }`}
+                                onClick={() => void onAssign(m.userId!._id)}
+                              >
+                                <Avatar
+                                  name={m.userId!.name ?? m.userId!.email}
+                                  className="h-5 w-5 text-[9px]"
+                                  plain
+                                />
+                                <span className="truncate">
+                                  {m.userId!.name ?? m.userId!.email}
+                                </span>
+                                <span className="ml-auto shrink-0 tabular-nums text-2xs text-ink-4">
+                                  {m.openLeadCount}
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  className="dc-btn dc-btn-sm"
+                  disabled={updateStatus.isPending || isChatClosed}
+                  title={
+                    isChatClosed
+                      ? 'This lead is already closed'
+                      : 'Mark the lead won or lost and stop counting it as open'
+                  }
+                  onClick={() => setCloseOpen(true)}
+                >
+                  <span className="hidden sm:inline">
+                    {isChatClosed ? 'Closed' : 'Close chat'}
+                  </span>
+                  <IconCheck className="h-3.5 w-3.5 sm:hidden" />
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setDetailsOpen((v) => !v)}
@@ -634,6 +845,40 @@ export function ChatsPage() {
               </div>
             ) : null}
 
+            {/* WhatsApp only delivers a free-form reply within 24 hours of the contact's
+                last message. Saying so up front beats an agent typing a paragraph that
+                Meta then refuses. */}
+            {serviceWindow?.known ? (
+              <div
+                className={`mx-4 mb-1 flex items-center gap-2 rounded-control border px-3 py-2 text-sm md:mx-5 ${
+                  serviceWindow.open
+                    ? 'border-warn-line bg-warn-soft text-warn'
+                    : 'border-line bg-subtle text-ink-3'
+                }`}
+              >
+                <IconClock className="h-3.5 w-3.5 shrink-0" />
+                {serviceWindow.open ? (
+                  <span>
+                    Free-text window closes in{' '}
+                    <strong className="font-semibold">
+                      {formatWindowLeft(serviceWindow.minutesLeft)}
+                    </strong>
+                    . After that only approved templates can be sent.
+                  </span>
+                ) : neverMessaged ? (
+                  <span>
+                    This contact has not messaged you yet — WhatsApp only allows an
+                    approved template to open the conversation.
+                  </span>
+                ) : (
+                  <span>
+                    The 24-hour window has closed — only an approved template will reach
+                    this contact now.
+                  </span>
+                )}
+              </div>
+            ) : null}
+
             <form
               onSubmit={onSend}
               className="flex shrink-0 flex-col gap-2.5 border-t border-line bg-surface px-4 pb-3.5 pt-3 md:px-5"
@@ -646,7 +891,12 @@ export function ChatsPage() {
                   <textarea
                     ref={textareaRef}
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      // The credit belongs to the saved reply only while its text is
+                      // still in the box.
+                      if (!e.target.value.trim()) setUsedQuickReplyId(null);
+                    }}
                     placeholder="Type a message"
                     rows={1}
                     className="max-h-36 w-full resize-none border-0 bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-ink-4"
@@ -667,7 +917,94 @@ export function ChatsPage() {
                   ) : null}
                 </div>
 
-                <div className="flex items-center gap-1.5 border-t border-line-soft bg-subtle px-2.5 py-2">
+                <div className="relative flex items-center gap-1.5 border-t border-line-soft bg-subtle px-2.5 py-2">
+                  <button
+                    type="button"
+                    className={`dc-btn dc-btn-xs ${!windowOpen ? 'border-brand bg-brand-soft text-brand-ink' : ''}`}
+                    onClick={() => {
+                      setQuickOpen(false);
+                      setTemplateOpen((v) => !v);
+                    }}
+                  >
+                    <IconTemplate className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Template</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="dc-btn dc-btn-xs"
+                    disabled={!windowOpen}
+                    title={
+                      windowOpen
+                        ? 'Insert a saved reply'
+                        : 'Saved replies are free text, so they need an open window'
+                    }
+                    onClick={() => {
+                      setTemplateOpen(false);
+                      setQuickOpen((v) => !v);
+                    }}
+                  >
+                    <IconBolt className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Quick reply</span>
+                  </button>
+
+                  {templateOpen ? (
+                    <Picker onClose={() => setTemplateOpen(false)} title="Approved templates">
+                      {!approvedTemplates.length ? (
+                        <p className="px-3 py-2.5 text-sm text-ink-3">
+                          No approved templates yet — submit one on the Templates page.
+                        </p>
+                      ) : (
+                        approvedTemplates.map((t) => (
+                          <button
+                            key={t._id}
+                            type="button"
+                            className="flex flex-col gap-0.5 px-3 py-2 text-left hover:bg-line-soft"
+                            onClick={() => void onSendTemplate(t._id)}
+                          >
+                            <span className="truncate text-sm font-medium text-ink">{t.name}</span>
+                            <span className="line-clamp-2 text-xs text-ink-4">{t.body}</span>
+                          </button>
+                        ))
+                      )}
+                    </Picker>
+                  ) : null}
+
+                  {quickOpen ? (
+                    <Picker onClose={() => setQuickOpen(false)} title="Saved replies">
+                      {!(quickRepliesQ.data ?? []).length ? (
+                        <p className="px-3 py-2.5 text-sm text-ink-3">
+                          No saved replies yet — add them in Automation.
+                        </p>
+                      ) : (
+                        (quickRepliesQ.data ?? []).map((q) => (
+                          <button
+                            key={q._id}
+                            type="button"
+                            className="flex flex-col gap-0.5 px-3 py-2 text-left hover:bg-line-soft"
+                            onClick={() => {
+                              // Inserted rather than sent: the agent almost always wants
+                              // to personalise the opening line first.
+                              setDraft((d) => (d.trim() ? `${d.trimEnd()}\n${q.body}` : q.body));
+                              setUsedQuickReplyId(q._id);
+                              setQuickOpen(false);
+                              textareaRef.current?.focus();
+                            }}
+                          >
+                            <span className="truncate text-sm font-medium text-ink">
+                              {q.title}
+                              {q.shortcut ? (
+                                <span className="ml-1.5 font-mono text-2xs text-ink-4">
+                                  /{q.shortcut}
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="line-clamp-2 text-xs text-ink-4">{q.body}</span>
+                          </button>
+                        ))
+                      )}
+                    </Picker>
+                  ) : null}
+
                   <label className="dc-btn dc-btn-xs cursor-pointer">
                     <IconPaperclip className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Attach</span>
@@ -708,9 +1045,53 @@ export function ChatsPage() {
       {/* Contact details */}
       {chatId && detailsOpen && openChat ? (
         <aside className="hidden w-[288px] shrink-0 flex-col overflow-y-auto border-l border-line bg-surface lg:flex">
-          <LeadDetailsPanel chat={openChat} />
+          <LeadDetailsPanel chat={openChat} detail={detailQ.data ?? null} />
         </aside>
       ) : null}
+      {/* Closing a lead is a pipeline outcome, not a dismissal, so it asks which one —
+          "won" and "lost" are what the reports and the round-robin load depend on. */}
+      {closeOpen ? (
+        <div className="dc-scrim" onClick={() => setCloseOpen(false)}>
+          <div className="dc-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="dc-card-head">
+              <h2 className="dc-card-title">Close this lead</h2>
+              <button
+                type="button"
+                className="ml-auto rounded-control p-1.5 text-ink-4 hover:bg-line-soft"
+                onClick={() => setCloseOpen(false)}
+                aria-label="Close"
+              >
+                <IconClose className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-3.5 p-4">
+              <p className="text-base text-ink-3">
+                It stops counting against {openChat?.assignedTo === userId ? 'your' : 'the agent’s'}{' '}
+                open leads. The conversation stays in the inbox.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="dc-btn dc-btn-primary flex-1"
+                  disabled={updateStatus.isPending}
+                  onClick={() => void onCloseChat('won')}
+                >
+                  Won
+                </button>
+                <button
+                  type="button"
+                  className="dc-btn dc-btn-danger flex-1"
+                  disabled={updateStatus.isPending}
+                  onClick={() => void onCloseChat('lost')}
+                >
+                  Lost
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Mobile/tablet: the same panel as a drawer, since there is no room beside the thread. */}
       {chatId && detailsOpen && openChat ? (
         <div className="dc-scrim lg:hidden" onClick={() => setDetailsOpen(false)}>
@@ -726,7 +1107,7 @@ export function ChatsPage() {
                 <IconClose className="h-3.5 w-3.5" />
               </button>
             </div>
-            <LeadDetailsPanel chat={openChat} />
+            <LeadDetailsPanel chat={openChat} detail={detailQ.data ?? null} />
           </div>
         </div>
       ) : null}
