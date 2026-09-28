@@ -660,6 +660,23 @@ export function useUpsertWhatsappNumberMutation() {
   });
 }
 
+/**
+ * Clears a conversation's unread badge when an agent opens it. The inbox counter
+ * only ever counted up before this existed.
+ */
+export function useMarkChatReadMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async (chatId: string) =>
+      (await api.post<{ ok: boolean }>(`/api/chats/${chatId}/read`)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['chats', companyId] });
+      void qc.invalidateQueries({ queryKey: ['workspace-summary', companyId] });
+    },
+  });
+}
+
 export function useSendChatMessageMutation() {
   const qc = useQueryClient();
   const companyId = useAuthStore((s) => s.companyId);

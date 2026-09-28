@@ -28,6 +28,7 @@ import {
   uploadChatAttachment,
   useChatMessagesInfiniteQuery,
   useChatsQuery,
+  useMarkChatReadMutation,
   useContactsQuery,
   useSendChatMessageMutation,
   useStartChatMutation,
@@ -94,6 +95,17 @@ export function ChatsPage() {
   const msgQ = useChatMessagesInfiniteQuery(chatId || null);
   const sendM = useSendChatMessageMutation();
   const startChat = useStartChatMutation();
+  const markRead = useMarkChatReadMutation();
+
+  // Opening a conversation clears its unread badge. Keyed off the chat's own unread
+  // count so re-renders and revisits do not fire a request for an already-read chat.
+  const openChatUnread =
+    (chatsQ.data ?? []).find((c) => String(c._id) === chatId)?.unreadCount ?? 0;
+  const markReadMutate = markRead.mutate;
+  useEffect(() => {
+    if (!chatId || openChatUnread <= 0) return;
+    markReadMutate(chatId);
+  }, [chatId, openChatUnread, markReadMutate]);
 
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
@@ -124,6 +136,11 @@ export function ChatsPage() {
       if (event === 'message:new') {
         const p = payload as { chatId: string };
         void queryClient.invalidateQueries({ queryKey: ['messages', companyId, p.chatId] });
+        void queryClient.invalidateQueries({ queryKey: ['chats', companyId] });
+      }
+      if (event === 'chat:read') {
+        // Another agent (or another tab) cleared the badge — refresh the list so this
+        // inbox does not keep showing the conversation as unread.
         void queryClient.invalidateQueries({ queryKey: ['chats', companyId] });
       }
       if (event === 'message:status' || event === 'message:media') {
@@ -292,13 +309,6 @@ export function ChatsPage() {
     }
   }, [chatId, openChat, listFilter, chatsQ.isLoading]);
 
-  // Opening a thread clears its unread count server-side; refresh the list so the
-  // badge disappears without waiting for the next inbound message.
-  useEffect(() => {
-    if (!chatId || !openChat?.unreadCount) return;
-    void queryClient.invalidateQueries({ queryKey: ['chats', companyId] });
-    void queryClient.invalidateQueries({ queryKey: ['lead-counts', companyId] });
-  }, [chatId, openChat?.unreadCount, companyId]);
   const openName = openChat?.contactId?.name || openChat?.contactId?.phone || 'Conversation';
   const openPhone = openChat?.contactId?.phone ?? '';
 

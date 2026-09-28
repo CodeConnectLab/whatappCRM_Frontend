@@ -28,6 +28,7 @@ export function useSocket(onEvent: (event: string, payload: unknown) => void) {
     socketRef.current = socket;
     const route = (event: string) => (payload: unknown) => handlerRef.current(event, payload);
     socket.on('message:new', route('message:new'));
+    socket.on('chat:read', route('chat:read'));
     socket.on('typing', route('typing'));
     socket.on('presence:online', route('presence:online'));
     return () => {
