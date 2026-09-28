@@ -8,7 +8,11 @@ import { api } from '../lib/api.ts';
 import { useAuthStore } from '../store/authStore.ts';
 import type {
   ActivityLogRow,
+  AssignmentCandidate,
+  AutoResponseRule,
   Campaign,
+  ChatDetail,
+  ChatNote,
   ChatRow,
   CompanyRow,
   Contact,
@@ -18,7 +22,12 @@ import type {
   MetaWhatsappConfig,
   CrmBridgeConfig,
   CrmBridgePushMode,
+  LeadCounts,
+  LeadStatus,
+  MediaKind,
   Paginated,
+  Product,
+  QuickReply,
   TeamMember,
   Template,
   TemplateCategory,
@@ -230,12 +239,172 @@ export function useActivityLogsQuery(page: number) {
   });
 }
 
-export function useChatsQuery() {
+export type ChatFilters = {
+  /** Ignored for agents — the server pins them to their own leads. */
+  assigned?: 'mine' | 'unassigned' | 'all' | string;
+  status?: LeadStatus | 'open';
+  productId?: string;
+  adOnly?: boolean;
+};
+
+export function useChatsQuery(filters: ChatFilters = {}) {
+  const companyId = useAuthStore((s) => s.companyId);
+  const params: Record<string, string> = {};
+  if (filters.assigned) params.assigned = filters.assigned;
+  if (filters.status) params.status = filters.status;
+  if (filters.productId) params.productId = filters.productId;
+  if (filters.adOnly) params.adOnly = 'true';
+
+  return useQuery({
+    queryKey: ['chats', companyId, params],
+    enabled: Boolean(companyId),
+    queryFn: async () => (await api.get<ChatRow[]>('/api/chats', { params })).data,
+  });
+}
+
+export function useLeadCountsQuery() {
   const companyId = useAuthStore((s) => s.companyId);
   return useQuery({
-    queryKey: ['chats', companyId],
+    queryKey: ['lead-counts', companyId],
     enabled: Boolean(companyId),
-    queryFn: async () => (await api.get<ChatRow[]>('/api/chats')).data,
+    queryFn: async () => (await api.get<LeadCounts>('/api/leads/counts')).data,
+  });
+}
+
+/** Who the round-robin would consider, with each member's live load. Admin-only. */
+export function useAssignmentCandidatesQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  const workspaceRole = useAuthStore((s) => s.workspaceRole);
+  return useQuery({
+    queryKey: ['lead-assignees', companyId],
+    enabled: Boolean(companyId) && workspaceRole === 'company_admin',
+    queryFn: async () => (await api.get<AssignmentCandidate[]>('/api/leads/assignees')).data,
+  });
+}
+
+function invalidateLeadViews(qc: ReturnType<typeof useQueryClient>, companyId: string | null) {
+  void qc.invalidateQueries({ queryKey: ['chats', companyId] });
+  void qc.invalidateQueries({ queryKey: ['lead-counts', companyId] });
+  void qc.invalidateQueries({ queryKey: ['lead-assignees', companyId] });
+  void qc.invalidateQueries({ queryKey: ['team', companyId] });
+}
+
+export function useReassignLeadMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({ chatId, assignedTo }: { chatId: string; assignedTo: string | null }) =>
+      (await api.patch(`/api/chats/${chatId}/assignment`, { assignedTo })).data,
+    onSuccess: () => invalidateLeadViews(qc, companyId),
+  });
+}
+
+export function useUpdateLeadStatusMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({ chatId, status }: { chatId: string; status: LeadStatus }) =>
+      (await api.patch<ChatRow>(`/api/chats/${chatId}/status`, { status })).data,
+    onSuccess: () => invalidateLeadViews(qc, companyId),
+  });
+}
+
+/** Spreads the unassigned backlog over the rotation — used after hiring an agent. */
+export function useDistributeLeadsMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async () =>
+      (await api.post<{ assigned: number }>('/api/leads/distribute')).data,
+    onSuccess: () => invalidateLeadViews(qc, companyId),
+  });
+}
+
+/** The details rail's whole payload: chat, service window, groups and activity. */
+export function useChatDetailQuery(chatId: string | null) {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['chat-detail', companyId, chatId],
+    enabled: Boolean(companyId && chatId),
+    queryFn: async () => (await api.get<ChatDetail>(`/api/chats/${chatId}`)).data,
+    // The 24-hour window counts down, so a stale payload would show a window that has
+    // already closed. A minute is close enough for a countdown shown to the minute.
+    refetchInterval: 60_000,
+  });
+}
+
+export function useUpdateContactTagsMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({ chatId, tags }: { chatId: string; tags: string[] }) =>
+      (await api.patch<{ tags: string[] }>(`/api/chats/${chatId}/tags`, { tags })).data,
+    onSuccess: (_d, { chatId }) => {
+      void qc.invalidateQueries({ queryKey: ['chat-detail', companyId, chatId] });
+      void qc.invalidateQueries({ queryKey: ['chats', companyId] });
+    },
+  });
+}
+
+export function useQuickRepliesQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['quick-replies', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => (await api.get<QuickReply[]>('/api/quick-replies')).data,
+  });
+}
+
+export function useQuickReplyMutations() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  const invalidate = () => void qc.invalidateQueries({ queryKey: ['quick-replies', companyId] });
+
+  const create = useMutation({
+    mutationFn: async (body: { title: string; body: string; shortcut?: string }) =>
+      (await api.post<QuickReply>('/api/quick-replies', body)).data,
+    onSuccess: invalidate,
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; title?: string; body?: string; shortcut?: string | null }) =>
+      (await api.patch<QuickReply>(`/api/quick-replies/${id}`, body)).data,
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/api/quick-replies/${id}`)).data,
+    onSuccess: invalidate,
+  });
+  return { create, update, remove };
+}
+
+export function useChatNotesQuery(chatId: string | null) {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['chat-notes', companyId, chatId],
+    enabled: Boolean(companyId && chatId),
+    queryFn: async () => (await api.get<ChatNote[]>(`/api/chats/${chatId}/notes`)).data,
+  });
+}
+
+export function useAddChatNoteMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({ chatId, body }: { chatId: string; body: string }) =>
+      (await api.post<ChatNote>(`/api/chats/${chatId}/notes`, { body })).data,
+    onSuccess: (_d, { chatId }) =>
+      void qc.invalidateQueries({ queryKey: ['chat-notes', companyId, chatId] }),
+  });
+}
+
+export function useDeleteChatNoteMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({ chatId, noteId }: { chatId: string; noteId: string }) =>
+      (await api.delete(`/api/chats/${chatId}/notes/${noteId}`)).data,
+    onSuccess: (_d, { chatId }) =>
+      void qc.invalidateQueries({ queryKey: ['chat-notes', companyId, chatId] }),
   });
 }
 
@@ -281,6 +450,81 @@ export function useInviteMemberMutation() {
     mutationFn: async (body: { email: string; role: 'company_admin' | 'agent' }) =>
       (await api.post('/api/team/invite', body)).data,
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['team', companyId] }),
+  });
+}
+
+/**
+ * Creates the login and the membership in one call. Replaces the old flow where the
+ * person had to register themselves before an admin could add them.
+ */
+export function useCreateTeamUserMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async (body: {
+      name: string;
+      email: string;
+      password: string;
+      role: 'company_admin' | 'agent';
+      availableForLeads?: boolean;
+    }) =>
+      (
+        await api.post<{ member: TeamMember; reusedExistingLogin: boolean }>(
+          '/api/team/users',
+          body,
+        )
+      ).data,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['team', companyId] }),
+  });
+}
+
+export function useUpdateTeamMemberMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({
+      membershipId,
+      ...body
+    }: {
+      membershipId: string;
+      role?: 'company_admin' | 'agent';
+      availableForLeads?: boolean;
+    }) => (await api.patch<TeamMember>(`/api/team/members/${membershipId}`, body)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['team', companyId] });
+      void qc.invalidateQueries({ queryKey: ['lead-assignees', companyId] });
+    },
+  });
+}
+
+export function useRemoveTeamMemberMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async (membershipId: string) =>
+      (await api.delete(`/api/team/members/${membershipId}`)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['team', companyId] });
+      void qc.invalidateQueries({ queryKey: ['chats', companyId] });
+      void qc.invalidateQueries({ queryKey: ['lead-counts', companyId] });
+    },
+  });
+}
+
+export function useResetMemberPasswordMutation() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  return useMutation({
+    mutationFn: async ({ membershipId, password }: { membershipId: string; password: string }) =>
+      (await api.post(`/api/team/members/${membershipId}/password`, { password })).data,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['team', companyId] }),
+  });
+}
+
+export function useChangeOwnPasswordMutation() {
+  return useMutation({
+    mutationFn: async (body: { currentPassword: string; password: string }) =>
+      (await api.post<{ ok: boolean }>('/api/auth/change-password', body)).data,
   });
 }
 
@@ -496,11 +740,189 @@ export function useSendChatMessageMutation() {
   const qc = useQueryClient();
   const companyId = useAuthStore((s) => s.companyId);
   return useMutation({
-    mutationFn: async ({ chatId, body }: { chatId: string; body: string }) =>
-      (await api.post<MessageRow>(`/api/chats/${chatId}/messages`, { body })).data,
+    mutationFn: async ({
+      chatId,
+      body,
+      mediaId,
+      templateId,
+      quickReplyId,
+    }: {
+      chatId: string;
+      body?: string;
+      mediaId?: string;
+      /** Approved template — the only thing deliverable once the window has closed. */
+      templateId?: string;
+      quickReplyId?: string;
+    }) =>
+      (
+        await api.post<MessageRow>(`/api/chats/${chatId}/messages`, {
+          ...(body ? { body } : {}),
+          ...(mediaId ? { mediaId } : {}),
+          ...(templateId ? { templateId } : {}),
+          ...(quickReplyId ? { quickReplyId } : {}),
+        })
+      ).data,
     onSuccess: (_data, { chatId }) => {
       void qc.invalidateQueries({ queryKey: ['messages', companyId, chatId] });
       void qc.invalidateQueries({ queryKey: ['chats', companyId] });
+      void qc.invalidateQueries({ queryKey: ['chat-detail', companyId, chatId] });
+      void qc.invalidateQueries({ queryKey: ['quick-replies', companyId] });
     },
   });
+}
+
+export type UploadedAttachment = {
+  mediaId: string;
+  url: string;
+  kind: MediaKind;
+  mimeType: string;
+  size: number;
+  filename: string;
+};
+
+/**
+ * Presign, PUT straight to storage, then confirm the size.
+ *
+ * The file never passes through the API — the browser uploads to the bucket itself,
+ * which keeps a 100 MB PDF off the Node process. The confirm step is what records the
+ * real size, and the server needs it to apply WhatsApp's per-type limits on send.
+ */
+export async function uploadChatAttachment(
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<UploadedAttachment> {
+  const contentType = file.type || 'application/octet-stream';
+  const { data: presigned } = await api.post<{
+    uploadUrl: string;
+    mediaId: string;
+    url: string;
+    kind: MediaKind;
+  }>('/api/media/presign', { filename: file.name, contentType, size: file.size });
+
+  // A bare fetch, not `api`: the presigned URL carries its own signature and our
+  // Authorization header would invalidate it.
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', presigned.uploadUrl, true);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Upload failed (${xhr.status})`));
+    xhr.onerror = () => reject(new Error('Upload failed — check your connection'));
+    xhr.send(file);
+  });
+
+  const { data: completed } = await api.post<{
+    mediaId: string;
+    url: string;
+    kind: MediaKind;
+    mimeType: string;
+    size: number;
+  }>(`/api/media/${presigned.mediaId}/complete`, { size: file.size });
+
+  return { ...completed, filename: file.name };
+}
+
+/** Re-signs an attachment whose read URL has expired mid-session. */
+export async function refreshMediaUrl(mediaId: string): Promise<string> {
+  const { data } = await api.get<{ url: string }>(`/api/media/${mediaId}/url`);
+  return data.url;
+}
+
+/* --------------------------------------------------- products & automation */
+
+export function useProductsQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['products', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => (await api.get<Product[]>('/api/products')).data,
+  });
+}
+
+export type ProductInput = {
+  name: string;
+  description?: string;
+  keywords?: string[];
+  adIds?: string[];
+  campaignNames?: string[];
+  whatsappNumberIds?: string[];
+  crmLabel?: string;
+  active?: boolean;
+};
+
+export function useProductMutations() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  const invalidate = () => void qc.invalidateQueries({ queryKey: ['products', companyId] });
+
+  const create = useMutation({
+    mutationFn: async (body: ProductInput) => (await api.post<Product>('/api/products', body)).data,
+    onSuccess: invalidate,
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, ...body }: ProductInput & { id: string }) =>
+      (await api.patch<Product>(`/api/products/${id}`, body)).data,
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/api/products/${id}`)).data,
+    onSuccess: invalidate,
+  });
+  return { create, update, remove };
+}
+
+export function useAutoResponsesQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  const workspaceRole = useAuthStore((s) => s.workspaceRole);
+  return useQuery({
+    queryKey: ['auto-responses', companyId],
+    enabled: Boolean(companyId) && workspaceRole === 'company_admin',
+    queryFn: async () => (await api.get<AutoResponseRule[]>('/api/auto-responses')).data,
+  });
+}
+
+export type AutoResponseInput = Partial<Omit<AutoResponseRule, '_id' | 'stats'>> & {
+  name?: string;
+};
+
+export function useAutoResponseMutations() {
+  const qc = useQueryClient();
+  const companyId = useAuthStore((s) => s.companyId);
+  const invalidate = () => void qc.invalidateQueries({ queryKey: ['auto-responses', companyId] });
+
+  const create = useMutation({
+    mutationFn: async (body: AutoResponseInput) =>
+      (await api.post<AutoResponseRule>('/api/auto-responses', body)).data,
+    onSuccess: invalidate,
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, ...body }: AutoResponseInput & { id: string }) =>
+      (await api.patch<AutoResponseRule>(`/api/auto-responses/${id}`, body)).data,
+    onSuccess: invalidate,
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/api/auto-responses/${id}`)).data,
+    onSuccess: invalidate,
+  });
+  /** Dry run: which rule would answer a lead that said this? */
+  const preview = useMutation({
+    mutationFn: async (body: {
+      messageBody: string;
+      productId?: string;
+      adSourceId?: string;
+      adHeadline?: string;
+      isAdLead?: boolean;
+    }) =>
+      (
+        await api.post<{
+          match: { ruleId: string; name: string; actionType: string; body?: string } | null;
+        }>('/api/auto-responses/preview', body)
+      ).data,
+  });
+  return { create, update, remove, preview };
 }

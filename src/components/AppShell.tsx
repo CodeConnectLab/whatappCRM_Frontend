@@ -3,9 +3,11 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api.ts';
 import { useAuthStore } from '../store/authStore.ts';
+import { ChangePasswordPrompt } from './ChangePasswordPrompt.tsx';
 import type { Wallet } from '../types/api.ts';
 import {
   IconActivity,
+  IconBolt,
   IconBuilding,
   IconChat,
   IconClose,
@@ -14,6 +16,7 @@ import {
   IconLogout,
   IconMegaphone,
   IconMenu,
+  IconFunnel,
   IconMoon,
   IconSearch,
   IconSettings,
@@ -32,6 +35,8 @@ function routeTitle(pathname: string): string {
     '/campaigns': 'Campaigns',
     '/templates': 'Templates',
     '/chats': 'Inbox',
+    '/leads': 'Leads',
+    '/automation': 'Automation',
     '/activity': 'Activity',
     '/wallet': 'Wallet',
     '/settings': 'Settings',
@@ -120,6 +125,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-full min-h-0 w-full overflow-hidden">
+      <ChangePasswordPrompt />
       {mobileOpen ? (
         <button
           type="button"
@@ -155,6 +161,7 @@ export function AppShell() {
         <div className="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto">
           <NavRow to="/" end icon={<IconDashboard className="h-4 w-4" />} label="Home" onClick={closeMobile} />
           <NavRow to="/chats" icon={<IconChat className="h-4 w-4" />} label="Inbox" onClick={closeMobile} />
+          <NavRow to="/leads" icon={<IconFunnel className="h-4 w-4" />} label="Leads" onClick={closeMobile} />
           <NavRow to="/contacts" icon={<IconContact className="h-4 w-4" />} label="Contacts" onClick={closeMobile} />
           <NavRow
             to="/campaigns"
@@ -163,6 +170,14 @@ export function AppShell() {
             onClick={closeMobile}
           />
           <NavRow to="/templates" icon={<IconTemplate className="h-4 w-4" />} label="Templates" onClick={closeMobile} />
+          {workspaceRole === 'company_admin' ? (
+            <NavRow
+              to="/automation"
+              icon={<IconBolt className="h-4 w-4" />}
+              label="Automation"
+              onClick={closeMobile}
+            />
+          ) : null}
 
           <NavGroup title="Workspace">
             <NavRow to="/team" icon={<IconUsers className="h-4 w-4" />} label="Team" onClick={closeMobile} />

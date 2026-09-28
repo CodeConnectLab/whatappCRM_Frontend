@@ -272,3 +272,88 @@ export function LogoMark(props: { className?: string }) {
     </svg>
   );
 }
+
+export function IconTrash(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 4.5h11M6 4.5V3h4v1.5M4.5 4.5 5 13.5h6l.5-9" />
+    </Icon>
+  );
+}
+
+export function IconKey(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="5.5" cy="10.5" r="2.5" />
+      <path d="M7.4 8.6 13 3m-2 0h2v2" />
+    </Icon>
+  );
+}
+
+export function IconCopy(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="6" y="6" width="7.5" height="7.5" rx="1.4" />
+      <path d="M3.5 10V4a1.5 1.5 0 0 1 1.5-1.5h5" />
+    </Icon>
+  );
+}
+
+export function IconRefresh(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M13.5 7.5a5.5 5.5 0 1 0-1.6 3.9M13.5 3.5v4h-4" />
+    </Icon>
+  );
+}
+
+export function IconBolt(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8.8 1.5 3.5 9h4l-.8 5.5L12.5 7h-4l.3-5.5Z" />
+    </Icon>
+  );
+}
+
+export function IconFunnel(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2 3h12l-4.8 5.5v5L6.8 12V8.5L2 3Z" />
+    </Icon>
+  );
+}
+
+export function IconNote(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 2h5.5l3.5 3.5v8.5h-9z" />
+      <path d="M9 2v3.5h3.5M6 9h4M6 11.5h2.5" />
+    </Icon>
+  );
+}
+
+export function IconFile(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 1.5h4.5L12 5v9.5H4z" />
+      <path d="M8.5 1.5V5H12" />
+    </Icon>
+  );
+}
+
+export function IconDownload(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8 2v8m0 0 2.5-2.5M8 10 5.5 7.5M2.5 13h11" />
+    </Icon>
+  );
+}
+
+export function IconTag(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M13.5 8.5 8.5 13.5 2.5 7.5V2.5h5l6 6Z" />
+      <circle cx="5.2" cy="5.2" r="0.8" />
+    </Icon>
+  );
+}

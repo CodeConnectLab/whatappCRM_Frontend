@@ -6,6 +6,8 @@ export type AuthUser = {
   email: string;
   name: string;
   isSuperAdmin?: boolean;
+  /** Set on accounts an admin created with a starting password. */
+  mustChangePassword?: boolean;
 };
 
 export type MembershipSummary = {
