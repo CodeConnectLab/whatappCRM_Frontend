@@ -140,22 +140,136 @@ export type TwilioAccountRow = {
   friendlyName?: string;
 };
 
+export type LeadStatus = 'new' | 'in_progress' | 'qualified' | 'won' | 'lost';
+
+/** First-touch ad attribution copied onto the conversation. */
+export type ChatReferral = {
+  ctwaClid?: string;
+  sourceId?: string;
+  sourceType?: string;
+  sourceUrl?: string;
+  headline?: string;
+  adBody?: string;
+};
+
 export type ChatRow = {
   _id: string;
   lastMessageAt?: string;
   lastMessagePreview?: string;
   unreadCount?: number;
-  contactId?: { name?: string; phone?: string };
+  contactId?: { _id?: string; name?: string; phone?: string; email?: string; tags?: string[] };
+  assignedTo?: string | null;
+  assignedAt?: string;
+  assignmentMethod?: 'auto' | 'manual' | 'self';
+  /** Resolved server-side so the list needs no extra lookup. */
+  assignedToUser?: { name?: string; email?: string } | null;
+  status?: LeadStatus;
+  productId?: string | null;
+  productName?: string | null;
+  referral?: ChatReferral;
+  firstInboundMessage?: string;
+  firstInboundAt?: string;
+  lastAgentReplyAt?: string;
+  crmSyncStatus?: string;
+  createdAt?: string;
+};
+
+export type MediaKind = 'image' | 'video' | 'audio' | 'document' | 'sticker';
+
+/** Attachment on a message. `url` is a short-lived signed link, minted per request. */
+export type MessageMedia = {
+  mediaId?: string;
+  url?: string | null;
+  mimeType?: string;
+  filename?: string;
+  size?: number;
+  kind?: MediaKind;
 };
 
 export type MessageRow = {
   _id: string;
   direction: 'inbound' | 'outbound';
   body: string;
+  messageType?: string;
   status: string;
   statusDetail?: string;
   createdAt: string;
   senderUserId?: string;
+  media?: MessageMedia;
+  isAutomated?: boolean;
+};
+
+export type ChatNote = {
+  _id: string;
+  body: string;
+  createdAt: string;
+  userId?: { _id?: string; name?: string; email?: string };
+};
+
+export type LeadCounts = {
+  new: number;
+  in_progress: number;
+  qualified: number;
+  won: number;
+  lost: number;
+  total: number;
+  unassigned: number;
+};
+
+export type AssignmentCandidate = {
+  userId: string;
+  role: 'company_admin' | 'agent';
+  openLeadCount: number;
+  lastAssignedAt: number;
+};
+
+export type Product = {
+  _id: string;
+  name: string;
+  description?: string;
+  keywords?: string[];
+  adIds?: string[];
+  campaignNames?: string[];
+  whatsappNumberIds?: string[];
+  crmLabel?: string;
+  active?: boolean;
+};
+
+export type AutoResponseTrigger =
+  | 'first_inbound'
+  | 'every_inbound'
+  | 'keyword'
+  | 'outside_hours'
+  | 'no_agent_reply';
+
+export type AutoResponseBusinessHours = {
+  timezone?: string;
+  startMinute: number;
+  endMinute: number;
+  weekdays?: number[];
+};
+
+export type AutoResponseRule = {
+  _id: string;
+  name: string;
+  enabled?: boolean;
+  priority?: number;
+  trigger: AutoResponseTrigger;
+  productId?: string | null;
+  adIds?: string[];
+  campaignNames?: string[];
+  whatsappNumberIds?: string[];
+  keywords?: string[];
+  adLeadsOnly?: boolean;
+  businessHours?: AutoResponseBusinessHours | null;
+  actionType?: 'text' | 'template';
+  body?: string;
+  templateId?: string | null;
+  mediaId?: string | null;
+  delaySeconds?: number;
+  delayMinutes?: number;
+  throttle?: 'once_per_chat' | 'once_per_day' | 'always';
+  stats?: { sent?: number; failed?: number; lastSentAt?: string; lastError?: string };
 };
 
 export type CompanyRow = {
@@ -166,8 +280,13 @@ export type CompanyRow = {
 
 export type TeamMember = {
   _id: string;
-  role: string;
-  userId?: { email?: string; name?: string };
+  role: 'company_admin' | 'agent';
+  /** Whether the round-robin includes this member. */
+  availableForLeads: boolean;
+  createdAt?: string;
+  userId: { _id: string; email?: string; name?: string; mustChangePassword?: boolean } | null;
+  /** Open leads currently sitting with this member. */
+  openLeadCount: number;
 };
 
 export type CrmBridgePushMode = 'ad_only' | 'all_inbound';

@@ -6,6 +6,8 @@ import { CampaignsPage } from './pages/CampaignsPage.tsx';
 import { ChatsPage } from './pages/ChatsPage.tsx';
 import { CompaniesPage } from './pages/CompaniesPage.tsx';
 import { ContactsPage } from './pages/ContactsPage.tsx';
+import { AutomationPage } from './pages/AutomationPage.tsx';
+import { LeadsPage } from './pages/LeadsPage.tsx';
 import { DashboardPage } from './pages/DashboardPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
@@ -41,6 +43,8 @@ export default function App() {
             <Route path="campaigns" element={<CampaignsPage />} />
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="chats" element={<ChatsPage />} />
+            <Route path="leads" element={<LeadsPage />} />
+            <Route path="automation" element={<AutomationPage />} />
             <Route path="activity" element={<ActivityPage />} />
             <Route path="wallet" element={<WalletPage />} />
             <Route path="settings" element={<SettingsPage />} />

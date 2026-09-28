@@ -21,14 +21,20 @@ import {
 import { WaOutboundTicks } from '../components/WaOutboundTicks.tsx';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
 import { Avatar } from '../components/workspace/WorkspaceSurface.tsx';
+import { LeadDetailsPanel } from '../components/chat/LeadDetailsPanel.tsx';
+import { MessageAttachment } from '../components/chat/MessageAttachment.tsx';
 import { useSocket } from '../hooks/useSocket.ts';
 import {
+  uploadChatAttachment,
   useChatMessagesInfiniteQuery,
   useChatsQuery,
   useContactsQuery,
   useSendChatMessageMutation,
   useStartChatMutation,
+  type ChatFilters,
+  type UploadedAttachment,
 } from '../hooks/apiHooks.ts';
+import { MEDIA_SIZE_LIMITS, formatBytes, guessMediaKind } from '../lib/leadUi.ts';
 import { queryClient } from '../lib/queryClient.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { useAuthStore } from '../store/authStore.ts';
@@ -52,7 +58,16 @@ function formatDayLabel(iso: string): string {
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-type ListFilter = 'all' | 'unread';
+type ListFilter = 'all' | 'unread' | 'unassigned';
+
+/** Attachment chosen in the composer, with its upload state. */
+type PendingAttachment = {
+  file: File;
+  /** Set once the upload finishes; until then the send button waits. */
+  uploaded?: UploadedAttachment;
+  progress: number;
+  error?: string;
+};
 
 export function ChatsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,8 +82,15 @@ export function ChatsPage() {
   const companyId = useAuthStore((s) => s.companyId);
   const userId = useAuthStore((s) => s.user?.id);
   const theme = useAuthStore((s) => s.theme);
+  const workspaceRole = useAuthStore((s) => s.workspaceRole);
+  const isAdmin = workspaceRole === 'company_admin';
 
-  const chatsQ = useChatsQuery();
+  const [listFilter, setListFilter] = useState<ListFilter>('all');
+  const chatFilters: ChatFilters = useMemo(
+    () => (listFilter === 'unassigned' ? { assigned: 'unassigned' } : {}),
+    [listFilter],
+  );
+  const chatsQ = useChatsQuery(chatFilters);
   const msgQ = useChatMessagesInfiniteQuery(chatId || null);
   const sendM = useSendChatMessageMutation();
   const startChat = useStartChatMutation();
@@ -78,13 +100,14 @@ export function ChatsPage() {
   const contactsQ = useContactsQuery(1, contactSearch);
 
   const [listQuery, setListQuery] = useState('');
-  const [listFilter, setListFilter] = useState<ListFilter>('all');
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [listOpenMobile, setListOpenMobile] = useState(false);
 
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const [pickerFiles, setPickerFiles] = useState<File[]>([]);
+  // One attachment at a time: WhatsApp delivers a single media object per message, so
+  // a multi-file picker would only be a promise the send could not keep.
+  const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
   const [typingHint, setTypingHint] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -103,9 +126,13 @@ export function ChatsPage() {
         void queryClient.invalidateQueries({ queryKey: ['messages', companyId, p.chatId] });
         void queryClient.invalidateQueries({ queryKey: ['chats', companyId] });
       }
-      if (event === 'message:status') {
+      if (event === 'message:status' || event === 'message:media') {
         const p = payload as { chatId: string };
         void queryClient.invalidateQueries({ queryKey: ['messages', companyId, p.chatId] });
+      }
+      if (event === 'lead:assigned' || event === 'lead:status') {
+        void queryClient.invalidateQueries({ queryKey: ['chats', companyId] });
+        void queryClient.invalidateQueries({ queryKey: ['lead-counts', companyId] });
       }
       if (event === 'typing') {
         const p = payload as { chatId: string; typing: boolean; userId: string };
@@ -174,18 +201,66 @@ export function ChatsPage() {
     }
   }
 
+  /**
+   * Uploads the picked file straight to storage, then sends the message.
+   *
+   * The upload starts as soon as the file is chosen, so by the time the agent finishes
+   * typing a caption there is usually nothing left to wait for.
+   */
+  const onPickFile = useCallback((file: File) => {
+    setSendErr(null);
+    const kind = guessMediaKind(file.type || 'application/octet-stream');
+    const limit = MEDIA_SIZE_LIMITS[kind];
+    if (file.size > limit) {
+      setSendErr(
+        `WhatsApp accepts ${kind} files up to ${formatBytes(limit)} — this one is ${formatBytes(file.size)}.`,
+      );
+      return;
+    }
+
+    setAttachment({ file, progress: 0 });
+    void uploadChatAttachment(file, (pct) =>
+      setAttachment((prev) => (prev?.file === file ? { ...prev, progress: pct } : prev)),
+    )
+      .then((uploaded) =>
+        setAttachment((prev) =>
+          prev?.file === file ? { ...prev, uploaded, progress: 100 } : prev,
+        ),
+      )
+      .catch((e: unknown) =>
+        setAttachment((prev) =>
+          prev?.file === file ? { ...prev, error: apiErrorMessage(e) } : prev,
+        ),
+      );
+  }, []);
+
+  const attachmentReady = Boolean(attachment?.uploaded);
+  const attachmentBusy = Boolean(attachment && !attachment.uploaded && !attachment.error);
+  const canSend = Boolean(chatId) && (Boolean(draft.trim()) || attachmentReady) && !attachmentBusy;
+
   const submitMessage = useCallback(async () => {
     setSendErr(null);
-    if (!chatId || !draft.trim()) return;
+    if (!chatId) return;
+    const mediaId = attachment?.uploaded?.mediaId;
+    const body = draft.trim();
+    if (!body && !mediaId) return;
+    if (attachment && !mediaId) {
+      setSendErr(attachment.error ?? 'Attachment is still uploading');
+      return;
+    }
     try {
-      await sendM.mutateAsync({ chatId, body: draft.trim() });
+      await sendM.mutateAsync({
+        chatId,
+        ...(body ? { body } : {}),
+        ...(mediaId ? { mediaId } : {}),
+      });
       setDraft('');
-      setPickerFiles([]);
+      setAttachment(null);
       setEmojiOpen(false);
     } catch (er) {
       setSendErr(apiErrorMessage(er));
     }
-  }, [chatId, draft, sendM]);
+  }, [attachment, chatId, draft, sendM]);
 
   async function onSend(e: FormEvent) {
     e.preventDefault();
@@ -198,6 +273,7 @@ export function ChatsPage() {
   const visibleChats = useMemo(() => {
     const q = listQuery.trim().toLowerCase();
     return allChats.filter((c) => {
+      // 'unassigned' is a server-side filter; only 'unread' needs narrowing here.
       if (listFilter === 'unread' && !(c.unreadCount ?? 0)) return false;
       if (!q) return true;
       const hay = `${c.contactId?.name ?? ''} ${c.contactId?.phone ?? ''} ${c.lastMessagePreview ?? ''}`;
@@ -206,6 +282,23 @@ export function ChatsPage() {
   }, [allChats, listFilter, listQuery]);
 
   const openChat = allChats.find((c) => c._id === chatId);
+
+  // Arriving from the Leads page with ?chat=… while the list is narrowed to unassigned
+  // would leave the thread open but the details panel empty, because the selected chat
+  // is not in the fetched page. Widen the list instead of showing half a screen.
+  useEffect(() => {
+    if (chatId && !openChat && listFilter === 'unassigned' && !chatsQ.isLoading) {
+      setListFilter('all');
+    }
+  }, [chatId, openChat, listFilter, chatsQ.isLoading]);
+
+  // Opening a thread clears its unread count server-side; refresh the list so the
+  // badge disappears without waiting for the next inbound message.
+  useEffect(() => {
+    if (!chatId || !openChat?.unreadCount) return;
+    void queryClient.invalidateQueries({ queryKey: ['chats', companyId] });
+    void queryClient.invalidateQueries({ queryKey: ['lead-counts', companyId] });
+  }, [chatId, openChat?.unreadCount, companyId]);
   const openName = openChat?.contactId?.name || openChat?.contactId?.phone || 'Conversation';
   const openPhone = openChat?.contactId?.phone ?? '';
 
@@ -256,6 +349,16 @@ export function ChatsPage() {
           >
             Unread <span className="opacity-60 tabular-nums">{unreadTotal}</span>
           </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => setListFilter('unassigned')}
+              className={`dc-pill ${listFilter === 'unassigned' ? 'dc-pill-active' : ''}`}
+              title="Leads nobody owns yet"
+            >
+              Unassigned
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -335,6 +438,20 @@ export function ChatsPage() {
                       </span>
                     ) : null}
                   </div>
+                  {/* Only admins see other people's leads, so the owner is only worth
+                      naming for them. */}
+                  {isAdmin ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-2xs text-ink-4">
+                        {c.assignedToUser?.name ?? c.assignedToUser?.email ?? 'Unassigned'}
+                      </span>
+                      {c.productName ? (
+                        <span className="ml-auto shrink-0 truncate text-2xs text-ink-4">
+                          {c.productName}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </button>
             );
@@ -437,14 +554,24 @@ export function ChatsPage() {
                             : 'self-start rounded-[10px] rounded-bl-[3px] border-line bg-surface'
                         }`}
                       >
-                        <span className="whitespace-pre-wrap break-words text-base leading-relaxed text-ink">
-                          {m.body}
-                        </span>
+                        {m.media ? <MessageAttachment media={m.media} outbound={out} /> : null}
+                        {/* An attachment with no caption carries a placeholder body like
+                            "[image]" — showing it under the picture would be noise. */}
+                        {m.body && !(m.media && /^\[[a-z ]+(: .*)?\]$/i.test(m.body.trim())) ? (
+                          <span className="whitespace-pre-wrap break-words text-base leading-relaxed text-ink">
+                            {m.body}
+                          </span>
+                        ) : null}
                         <span
                           className={`flex items-center gap-1.5 self-end text-2xs ${
                             out ? 'text-brand-ink/75' : 'text-ink-4'
                           }`}
                         >
+                          {m.isAutomated ? (
+                            <span className="dc-badge px-1.5 py-0 text-2xs" title="Sent by an auto-response rule">
+                              auto
+                            </span>
+                          ) : null}
                           <span className="tabular-nums">{formatMsgTime(m.createdAt)}</span>
                           {out ? <WaOutboundTicks status={m.status} statusDetail={m.statusDetail} /> : null}
                         </span>
@@ -463,13 +590,37 @@ export function ChatsPage() {
               ) : null}
             </div>
 
-            {pickerFiles.length ? (
-              <div className="mx-4 mb-1 flex flex-wrap gap-1.5 rounded-control border border-dashed border-line bg-surface px-3 py-2 text-sm">
-                {pickerFiles.map((f) => (
-                  <span key={f.name + f.size} className="dc-badge">
-                    {f.name} ({Math.round(f.size / 1024)} KB) · preview only
+            {attachment ? (
+              <div className="mx-4 mb-1 flex items-center gap-2.5 rounded-control border border-line bg-surface px-3 py-2">
+                <IconPaperclip className="h-3.5 w-3.5 shrink-0 text-ink-4" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate text-sm text-ink">
+                    {attachment.file.name}{' '}
+                    <span className="text-ink-4">({formatBytes(attachment.file.size)})</span>
                   </span>
-                ))}
+                  {attachment.error ? (
+                    <span className="text-2xs text-danger">{attachment.error}</span>
+                  ) : attachment.uploaded ? (
+                    <span className="text-2xs text-ink-4">
+                      Ready to send as {attachment.uploaded.kind}
+                    </span>
+                  ) : (
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-line-soft">
+                      <div
+                        className="h-full rounded-full bg-brand transition-[width] duration-200"
+                        style={{ width: `${attachment.progress}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-control p-1.5 text-ink-4 hover:bg-line-soft hover:text-ink"
+                  onClick={() => setAttachment(null)}
+                  aria-label="Remove attachment"
+                >
+                  <IconClose className="h-3.5 w-3.5" />
+                </button>
               </div>
             ) : null}
 
@@ -512,10 +663,11 @@ export function ChatsPage() {
                     <span className="hidden sm:inline">Attach</span>
                     <input
                       type="file"
-                      multiple
                       className="hidden"
+                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
                       onChange={(e) => {
-                        setPickerFiles(e.target.files ? Array.from(e.target.files) : []);
+                        const file = e.target.files?.[0];
+                        if (file) onPickFile(file);
                         e.target.value = '';
                       }}
                     />
@@ -531,10 +683,10 @@ export function ChatsPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={sendM.isPending || !draft.trim()}
+                    disabled={sendM.isPending || !canSend}
                     className="dc-btn dc-btn-xs dc-btn-primary ml-auto px-4 font-medium"
                   >
-                    {sendM.isPending ? '…' : 'Send'}
+                    {sendM.isPending ? '…' : attachmentBusy ? 'Uploading…' : 'Send'}
                   </button>
                 </div>
               </div>
@@ -544,31 +696,29 @@ export function ChatsPage() {
       </section>
 
       {/* Contact details */}
-      {chatId && detailsOpen ? (
-        <aside className="hidden w-[252px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-line bg-surface p-4 lg:flex">
-          <div className="flex flex-col items-center gap-2">
-            <Avatar name={openName} className="h-[52px] w-[52px] text-lg" plain />
-            <span className="text-md font-semibold text-ink">{openName}</span>
-            <span className="dc-badge dc-badge-brand rounded-full px-2.5">WhatsApp</span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-ink-4">Phone</span>
-            <span className="text-base tabular-nums text-ink">{openPhone || '—'}</span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-ink-4">Last message</span>
-            <span className="text-base text-ink">
-              {openChat?.lastMessageAt ? new Date(openChat.lastMessageAt).toLocaleString() : '—'}
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-1.5 border-t border-line-soft pt-3.5">
-            <span className="text-xs text-ink-4">Unread</span>
-            <span className="text-base tabular-nums text-ink">{openChat?.unreadCount ?? 0}</span>
-          </div>
+      {chatId && detailsOpen && openChat ? (
+        <aside className="hidden w-[288px] shrink-0 flex-col overflow-y-auto border-l border-line bg-surface lg:flex">
+          <LeadDetailsPanel chat={openChat} />
         </aside>
+      ) : null}
+      {/* Mobile/tablet: the same panel as a drawer, since there is no room beside the thread. */}
+      {chatId && detailsOpen && openChat ? (
+        <div className="dc-scrim lg:hidden" onClick={() => setDetailsOpen(false)}>
+          <div className="dc-drawer overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex h-14 shrink-0 items-center border-b border-line px-4">
+              <span className="text-md font-semibold text-ink">Lead details</span>
+              <button
+                type="button"
+                className="ml-auto rounded-control p-1.5 text-ink-4 hover:bg-line-soft"
+                onClick={() => setDetailsOpen(false)}
+                aria-label="Close details"
+              >
+                <IconClose className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <LeadDetailsPanel chat={openChat} />
+          </div>
+        </div>
       ) : null}
     </div>
   );
