@@ -273,6 +273,17 @@ export type Product = {
   active?: boolean;
 };
 
+/** An ad or post that has actually produced leads, for the product/rule mapping UI. */
+export type AdSource = {
+  sourceId: string;
+  sourceType?: string;
+  headline?: string;
+  leadCount: number;
+  lastSeenAt?: string;
+  productId?: string;
+  productName?: string;
+};
+
 export type AutoResponseTrigger =
   | 'first_inbound'
   | 'every_inbound'

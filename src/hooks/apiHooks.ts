@@ -8,6 +8,7 @@ import { api } from '../lib/api.ts';
 import { useAuthStore } from '../store/authStore.ts';
 import type {
   ActivityLogRow,
+  AdSource,
   AssignmentCandidate,
   AutoResponseRule,
   Campaign,
@@ -834,6 +835,19 @@ export async function refreshMediaUrl(mediaId: string): Promise<string> {
 }
 
 /* --------------------------------------------------- products & automation */
+
+/**
+ * Ad IDs and headlines Meta has already sent with real leads. This is where an operator
+ * gets the values for the mapping fields — no digging in Ads Manager.
+ */
+export function useAdSourcesQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['ad-sources', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => (await api.get<AdSource[]>('/api/ad-sources')).data,
+  });
+}
 
 export function useProductsQuery() {
   const companyId = useAuthStore((s) => s.companyId);

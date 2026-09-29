@@ -14,6 +14,8 @@ import {
 import { useAuthStore } from '../store/authStore.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
+import { AdSourcePicker } from '../components/AdSourcePicker.tsx';
+import { VariableHints, VariableTextarea } from '../components/VariableTextarea.tsx';
 import { IconBolt, IconClose, IconPlus, IconTag, IconTrash } from '../components/Icons.tsx';
 import {
   CardNote,
@@ -51,6 +53,13 @@ function toTimeInput(minutes: number): string {
 function fromTimeInput(value: string): number {
   const [h, m] = value.split(':');
   return Number(h ?? 0) * 60 + Number(m ?? 0);
+}
+
+/** Appends a value to a comma-separated field, ignoring one that is already there. */
+function appendToList(current: string, value: string): string {
+  const parts = splitList(current);
+  if (parts.some((p) => p.toLowerCase() === value.trim().toLowerCase())) return current;
+  return [...parts, value.trim()].join(', ');
 }
 
 function splitList(value: string): string[] {
@@ -137,6 +146,11 @@ function ProductForm(props: { product?: Product; onDone: () => void }) {
         <span className="text-xs text-ink-4">
           Strongest signal — Meta sends the ad ID with the lead's first message. Comma separated.
         </span>
+        <AdSourcePicker
+          selectedIds={splitList(adIds)}
+          onPickId={(id) => setAdIds((v) => appendToList(v, id))}
+          onPickHeadline={(h) => setCampaignNames((v) => appendToList(v, h))}
+        />
       </label>
 
       <label className="dc-label">
@@ -246,6 +260,8 @@ function QuickReplyForm(props: { reply?: QuickReply; onDone: () => void }) {
       <WorkspaceAlert tone="neutral">
         A saved reply is your own text, not a WhatsApp template — it needs no Meta
         approval, but it only reaches a contact within 24 hours of their last message.
+        Placeholders like {'{{name}}'} are <strong>not</strong> filled in here: the text
+        is dropped into the composer for the agent to edit before sending.
       </WorkspaceAlert>
 
       <label className="dc-label">
@@ -493,6 +509,11 @@ function AutoResponseForm(props: { rule?: AutoResponseRule; onDone: () => void }
             className="dc-input font-mono text-sm"
             placeholder="120210000000000"
           />
+          <AdSourcePicker
+            selectedIds={splitList(adIds)}
+            onPickId={(id) => setAdIds((v) => appendToList(v, id))}
+            onPickHeadline={(h) => setCampaignNames((v) => appendToList(v, h))}
+          />
         </label>
 
         <label className="dc-label">
@@ -626,17 +647,18 @@ function AutoResponseForm(props: { rule?: AutoResponseRule; onDone: () => void }
         {actionType === 'text' ? (
           <label className="dc-label">
             <span className="dc-label-text">Message</span>
-            <textarea
+            <VariableTextarea
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={setBody}
               rows={4}
-              className="dc-textarea"
               placeholder="Hi {{name}}, thanks for your interest in {{product}}! {{agent}} will call you shortly."
               required={actionType === 'text'}
             />
             <span className="text-xs text-ink-4">
-              Placeholders: {'{{name}}'} {'{{phone}}'} {'{{email}}'} {'{{product}}'} {'{{agent}}'}
+              Type <code className="font-mono">{'{{'}</code> to pick a placeholder, or tap one
+              below.
             </span>
+            <VariableHints onPick={(key) => setBody((b) => `${b}{{${key}}}`)} />
           </label>
         ) : (
           <label className="dc-label">
