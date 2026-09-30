@@ -14,6 +14,7 @@ import { MetaWebhookStatusBanner } from '../components/settings/MetaWebhookStatu
 import { MetaSetupStatus } from '../components/settings/MetaSetupStatus.tsx';
 import { TwilioSettingsPanels } from '../components/settings/TwilioSettingsPanels.tsx';
 import { CrmBridgePanel } from '../components/settings/CrmBridgePanel.tsx';
+import { MediaStoragePanel } from '../components/settings/MediaStoragePanel.tsx';
 import { SHOW_TWILIO_UI } from '../config/features.ts';
 import { visibleWhatsappSenders } from '../lib/visibleSenders.ts';
 import { CardNote, PageHeader, WorkspaceCard } from '../components/workspace/WorkspaceSurface.tsx';
@@ -197,6 +198,8 @@ export function SettingsPage() {
             canManage ? (
               <>
                 <MetaSetupStatus summary={summary.data} />
+
+                <MediaStoragePanel />
 
                 {SHOW_TWILIO_UI ? <TwilioSettingsPanels onError={setErr} /> : null}
 

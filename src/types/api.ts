@@ -186,6 +186,8 @@ export type MessageMedia = {
   filename?: string;
   size?: number;
   kind?: MediaKind;
+  /** Set when the file could not be copied out of WhatsApp, with the reason. */
+  unavailableReason?: string;
 };
 
 export type MessageRow = {

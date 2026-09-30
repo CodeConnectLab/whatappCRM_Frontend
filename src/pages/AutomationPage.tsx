@@ -15,7 +15,11 @@ import { useAuthStore } from '../store/authStore.ts';
 import { apiErrorMessage } from '../lib/errors.ts';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
 import { AdSourcePicker } from '../components/AdSourcePicker.tsx';
-import { VariableHints, VariableTextarea } from '../components/VariableTextarea.tsx';
+import {
+  VariableFallbackHint,
+  VariableHints,
+  VariableTextarea,
+} from '../components/VariableTextarea.tsx';
 import { IconBolt, IconClose, IconPlus, IconTag, IconTrash } from '../components/Icons.tsx';
 import {
   CardNote,
@@ -659,6 +663,7 @@ function AutoResponseForm(props: { rule?: AutoResponseRule; onDone: () => void }
               below.
             </span>
             <VariableHints onPick={(key) => setBody((b) => `${b}{{${key}}}`)} />
+            <VariableFallbackHint />
           </label>
         ) : (
           <label className="dc-label">

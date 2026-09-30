@@ -144,6 +144,26 @@ export function VariableTextarea(props: {
   );
 }
 
+/**
+ * Explains the fallback form.
+ *
+ * A placeholder that resolves to nothing breaks the sentence it sits in — a lead that
+ * matched no product was greeted with "thanks for your interest in the ." — so the
+ * fallback is not a nicety and operators have to be able to find it.
+ */
+export function VariableFallbackHint() {
+  return (
+    <span className="text-xs leading-relaxed text-ink-4">
+      Not every lead has every value. Add a fallback after a pipe so the sentence still
+      reads:{' '}
+      <code className="rounded bg-muted px-1 font-mono text-2xs text-ink-2">
+        {'{{product|our services}}'}
+      </code>
+      .
+    </span>
+  );
+}
+
 /** Chips under the box — clicking one inserts it, for people who do not type `{{`. */
 export function VariableHints(props: {
   onPick: (key: string) => void;
