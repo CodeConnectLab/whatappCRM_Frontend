@@ -13,12 +13,26 @@ export function InfoTip(props: {
   children: ReactNode;
   /** Which side to open on. Defaults to above, which suits the composer. */
   placement?: 'top' | 'bottom';
+  /**
+   * Which edge to line the panel up with. The panel is wide, so a centred one hanging
+   * off an icon at the right of its row overflows the screen and the surrounding
+   * `overflow-hidden` clips it — which is exactly what happened in the inbox.
+   */
+  align?: 'center' | 'left' | 'right';
   label?: string;
   className?: string;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const placement = props.placement ?? 'top';
+  const align = props.align ?? 'center';
+
+  const alignment =
+    align === 'right'
+      ? 'right-0'
+      : align === 'left'
+        ? 'left-0'
+        : 'left-1/2 -translate-x-1/2';
 
   return (
     <span className={`relative inline-flex ${props.className ?? ''}`}>
@@ -44,7 +58,7 @@ export function InfoTip(props: {
         <span
           id={id}
           role="tooltip"
-          className={`absolute left-1/2 z-40 w-[min(22rem,calc(100vw-3rem))] -translate-x-1/2 rounded-card border border-line bg-surface px-3 py-2.5 text-left text-sm font-normal leading-relaxed text-ink shadow-modal ${
+          className={`absolute z-40 w-[min(22rem,calc(100vw-3rem))] rounded-card border border-line bg-surface px-3 py-2.5 text-left text-sm font-normal leading-relaxed text-ink shadow-modal ${alignment} ${
             placement === 'top' ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'
           }`}
         >
