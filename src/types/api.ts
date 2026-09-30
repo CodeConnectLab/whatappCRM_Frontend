@@ -186,6 +186,8 @@ export type MessageMedia = {
   filename?: string;
   size?: number;
   kind?: MediaKind;
+  /** Set when the file could not be copied out of WhatsApp, with the reason. */
+  unavailableReason?: string;
 };
 
 export type MessageRow = {
@@ -271,6 +273,17 @@ export type Product = {
   whatsappNumberIds?: string[];
   crmLabel?: string;
   active?: boolean;
+};
+
+/** An ad or post that has actually produced leads, for the product/rule mapping UI. */
+export type AdSource = {
+  sourceId: string;
+  sourceType?: string;
+  headline?: string;
+  leadCount: number;
+  lastSeenAt?: string;
+  productId?: string;
+  productName?: string;
 };
 
 export type AutoResponseTrigger =

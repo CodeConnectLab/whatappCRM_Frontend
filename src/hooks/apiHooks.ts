@@ -8,6 +8,7 @@ import { api } from '../lib/api.ts';
 import { useAuthStore } from '../store/authStore.ts';
 import type {
   ActivityLogRow,
+  AdSource,
   AssignmentCandidate,
   AutoResponseRule,
   Campaign,
@@ -771,6 +772,24 @@ export function useSendChatMessageMutation() {
   });
 }
 
+/** Maps an S3 rejection to something an operator can act on. */
+function uploadErrorMessage(status: number, code?: string): string {
+  switch (code) {
+    case 'AccessDenied':
+      return 'Storage rejected the upload (access denied). The bucket policy or the upload URL\u2019s permissions need fixing.';
+    case 'SignatureDoesNotMatch':
+      return 'Storage rejected the upload signature. The server\u2019s storage keys are wrong or its clock is off.';
+    case 'NoSuchBucket':
+      return 'The storage bucket does not exist. Check the bucket name in the API settings.';
+    case 'EntityTooLarge':
+      return 'The file is larger than storage accepts.';
+    default:
+      return code
+        ? `Storage rejected the upload (${code}).`
+        : `Upload failed with status ${status}.`;
+  }
+}
+
 export type UploadedAttachment = {
   mediaId: string;
   url: string;
@@ -799,7 +818,7 @@ export async function uploadChatAttachment(
     kind: MediaKind;
   }>('/api/media/presign', { filename: file.name, contentType, size: file.size });
 
-  // A bare fetch, not `api`: the presigned URL carries its own signature and our
+  // A bare XHR, not `api`: the presigned URL carries its own signature and our
   // Authorization header would invalidate it.
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -808,11 +827,26 @@ export async function uploadChatAttachment(
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
-    xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300
-        ? resolve()
-        : reject(new Error(`Upload failed (${xhr.status})`));
-    xhr.onerror = () => reject(new Error('Upload failed — check your connection'));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      // S3 answers with an XML body naming the actual problem; surfacing that beats a
+      // bare status code, because the fix differs completely between AccessDenied,
+      // SignatureDoesNotMatch and NoSuchBucket.
+      const code = /<Code>([^<]+)<\/Code>/.exec(xhr.responseText ?? '')?.[1];
+      reject(new Error(uploadErrorMessage(xhr.status, code)));
+    };
+    // Status 0 means the browser refused the request rather than the bucket: almost
+    // always a missing CORS rule on the bucket, which no amount of retrying fixes.
+    xhr.onerror = () =>
+      reject(
+        new Error(
+          'The browser blocked the upload. The storage bucket needs a CORS rule allowing PUT from this site — ask an admin to run Settings → Test media storage.',
+        ),
+      );
+    xhr.ontimeout = () => reject(new Error('The upload timed out. Try a smaller file or check the connection.'));
     xhr.send(file);
   });
 
@@ -834,6 +868,19 @@ export async function refreshMediaUrl(mediaId: string): Promise<string> {
 }
 
 /* --------------------------------------------------- products & automation */
+
+/**
+ * Ad IDs and headlines Meta has already sent with real leads. This is where an operator
+ * gets the values for the mapping fields — no digging in Ads Manager.
+ */
+export function useAdSourcesQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['ad-sources', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => (await api.get<AdSource[]>('/api/ad-sources')).data,
+  });
+}
 
 export function useProductsQuery() {
   const companyId = useAuthStore((s) => s.companyId);

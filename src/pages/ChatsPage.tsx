@@ -25,6 +25,7 @@ import {
 } from '../components/Icons.tsx';
 import { WaOutboundTicks } from '../components/WaOutboundTicks.tsx';
 import { NeedsCompanyBanner } from '../components/NeedsCompanyBanner.tsx';
+import { InfoTip } from '../components/InfoTip.tsx';
 import { Avatar } from '../components/workspace/WorkspaceSurface.tsx';
 import { LeadDetailsPanel } from '../components/chat/LeadDetailsPanel.tsx';
 import { MessageAttachment } from '../components/chat/MessageAttachment.tsx';
@@ -72,6 +73,13 @@ function formatDayLabel(iso: string): string {
 }
 
 /** The design's three views. Agents only ever see their own, so they get no tabs. */
+/** WhatsApp types that arrive as a file, so a bare body text is a placeholder. */
+const ATTACHMENT_TYPES = new Set(['image', 'video', 'audio', 'document', 'sticker', 'voice']);
+
+function isAttachmentType(messageType?: string): boolean {
+  return Boolean(messageType && ATTACHMENT_TYPES.has(messageType.toLowerCase()));
+}
+
 /** "3h 12m" / "48m" — the countdown the design shows above the composer. */
 function formatWindowLeft(minutes: number): string {
   if (minutes <= 0) return '0m';
@@ -775,7 +783,17 @@ export function ChatsPage() {
                             : 'self-start rounded-[10px] rounded-bl-[3px] border-line bg-surface'
                         }`}
                       >
-                        {m.media ? <MessageAttachment media={m.media} outbound={out} /> : null}
+                        {m.media ? (
+                          <MessageAttachment media={m.media} outbound={out} />
+                        ) : isAttachmentType(m.messageType) ? (
+                          // The webhook writes a "[image]" placeholder body immediately and
+                          // the file arrives moments later on its own event. Until it does,
+                          // show that an attachment is coming rather than the literal text.
+                          <span className="flex items-center gap-2 rounded-control border border-dashed border-line bg-subtle px-2.5 py-2 text-sm text-ink-4">
+                            <IconPaperclip className="h-3.5 w-3.5 shrink-0" />
+                            Fetching {m.messageType}…
+                          </span>
+                        ) : null}
                         {/* An attachment with no caption carries a placeholder body like
                             "[image]" — showing it under the picture would be noise. */}
                         {m.body && !(m.media && /^\[[a-z ]+(: .*)?\]$/i.test(m.body.trim())) ? (
@@ -859,23 +877,50 @@ export function ChatsPage() {
                 <IconClock className="h-3.5 w-3.5 shrink-0" />
                 {serviceWindow.open ? (
                   <span>
-                    Free-text window closes in{' '}
+                    You can reply freely for another{' '}
                     <strong className="font-semibold">
                       {formatWindowLeft(serviceWindow.minutesLeft)}
                     </strong>
-                    . After that only approved templates can be sent.
+                    {openName ? `, until ${openName.split(' ')[0]} writes again` : ''}. After
+                    that, only an approved template will reach them.
                   </span>
                 ) : neverMessaged ? (
                   <span>
-                    This contact has not messaged you yet — WhatsApp only allows an
-                    approved template to open the conversation.
+                    This contact has never messaged you, so there is no open window —
+                    WhatsApp only allows an approved template to start the conversation.
                   </span>
                 ) : (
                   <span>
-                    The 24-hour window has closed — only an approved template will reach
-                    this contact now.
+                    More than 24 hours since their last message, so free text will not be
+                    delivered — send an approved template to reopen the conversation.
                   </span>
                 )}
+
+                <InfoTip className="ml-auto shrink-0" label="How the 24-hour window works">
+                  <span className="flex flex-col gap-2">
+                    <span className="block font-semibold text-ink">
+                      WhatsApp&rsquo;s 24-hour window
+                    </span>
+                    <span className="block text-ink-2">
+                      WhatsApp lets you send free text only within 24 hours of the
+                      customer&rsquo;s <em>last message to you</em>.
+                    </span>
+                    <span className="block text-ink-2">
+                      <strong className="text-ink">Your replies do not extend it.</strong>{' '}
+                      Answering at 11am does not buy another 24 hours — the clock still runs
+                      from their message. Only a new message from them resets it to a full
+                      24 hours.
+                    </span>
+                    <span className="block text-ink-2">
+                      Once it closes, an approved template is the only thing that gets
+                      through. If they reply to that template, the window opens again and
+                      you can go back to normal messages.
+                    </span>
+                    <span className="block text-ink-3">
+                      Replies inside the window are free. Templates are billed by Meta.
+                    </span>
+                  </span>
+                </InfoTip>
               </div>
             ) : null}
 
@@ -886,8 +931,11 @@ export function ChatsPage() {
             >
               {sendErr ? <p className="dc-note dc-note-danger">{sendErr}</p> : null}
 
-              <div className="overflow-hidden rounded-card border border-line">
-                <div className="relative">
+              {/* Deliberately NOT overflow-hidden: the emoji and template popovers open
+                  upwards, out of this box, and clipping is what cut them in half. The
+                  corners are rounded on the children instead. */}
+              <div className="rounded-card border border-line">
+                <div className="relative rounded-t-card">
                   <textarea
                     ref={textareaRef}
                     value={draft}
@@ -899,7 +947,7 @@ export function ChatsPage() {
                     }}
                     placeholder="Type a message"
                     rows={1}
-                    className="max-h-36 w-full resize-none border-0 bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-ink-4"
+                    className="max-h-36 w-full resize-none rounded-t-card border-0 bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-ink-4"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -908,7 +956,7 @@ export function ChatsPage() {
                     }}
                   />
                   {emojiOpen ? (
-                    <div className="absolute bottom-[calc(100%+8px)] right-0 z-20 drop-shadow-xl">
+                    <div className="absolute bottom-[calc(100%+8px)] right-0 z-30 drop-shadow-xl">
                       <EmojiPicker
                         theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
                         onEmojiClick={(ev) => setDraft((d) => d + ev.emoji)}
@@ -917,7 +965,7 @@ export function ChatsPage() {
                   ) : null}
                 </div>
 
-                <div className="relative flex items-center gap-1.5 border-t border-line-soft bg-subtle px-2.5 py-2">
+                <div className="relative flex items-center gap-1.5 rounded-b-card border-t border-line-soft bg-subtle px-2.5 py-2">
                   <button
                     type="button"
                     className={`dc-btn dc-btn-xs ${!windowOpen ? 'border-brand bg-brand-soft text-brand-ink' : ''}`}
