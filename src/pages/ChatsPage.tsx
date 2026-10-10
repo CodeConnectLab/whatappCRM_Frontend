@@ -896,7 +896,11 @@ export function ChatsPage() {
                   </span>
                 )}
 
-                <InfoTip className="ml-auto shrink-0" label="How the 24-hour window works">
+                <InfoTip
+                  className="ml-auto shrink-0"
+                  align="right"
+                  label="How the 24-hour window works"
+                >
                   <span className="flex flex-col gap-2">
                     <span className="block font-semibold text-ink">
                       WhatsApp&rsquo;s 24-hour window
