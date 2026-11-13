@@ -29,6 +29,7 @@ import type {
   Paginated,
   Product,
   QuickReply,
+  SubscriptionDetail,
   TeamMember,
   Template,
   TemplateCategory,
@@ -144,6 +145,16 @@ export function useWorkspaceSummaryQuery() {
     queryKey: ['workspace-summary', companyId],
     enabled: Boolean(companyId),
     queryFn: async () => (await api.get<WorkspaceSummary>('/api/workspace/summary')).data,
+  });
+}
+
+/** Stays readable while expired — the backend keeps this route above the subscription guard. */
+export function useSubscriptionQuery() {
+  const companyId = useAuthStore((s) => s.companyId);
+  return useQuery({
+    queryKey: ['subscription', companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => (await api.get<SubscriptionDetail>('/api/subscription')).data,
   });
 }
 

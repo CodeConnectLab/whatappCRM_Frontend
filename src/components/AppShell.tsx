@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api.ts';
 import { useAuthStore } from '../store/authStore.ts';
 import { ChangePasswordPrompt } from './ChangePasswordPrompt.tsx';
+import { SubscriptionBanner } from './SubscriptionBanner.tsx';
 import type { Wallet } from '../types/api.ts';
 import {
   IconActivity,
@@ -256,6 +257,8 @@ export function AppShell() {
             <div className="dc-avatar h-[30px] w-[30px] text-sm">{initials}</div>
           </div>
         </header>
+
+        <SubscriptionBanner />
 
         <main
           className={`flex min-h-0 min-w-0 flex-1 flex-col ${

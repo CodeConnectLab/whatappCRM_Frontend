@@ -22,6 +22,21 @@ api.interceptors.response.use(
   (r) => r,
   async (error: AxiosError) => {
     const original = error.config;
+
+    /**
+     * Safety net for a stale store: the guard in RequireAuth normally catches expiry
+     * first, but a subscription that lapses mid-session only shows up as a 403 here.
+     */
+    const body = error.response?.data as { code?: string } | undefined;
+    if (
+      error.response?.status === 403 &&
+      body?.code === 'SUBSCRIPTION_EXPIRED' &&
+      window.location.pathname !== '/subscription-expired'
+    ) {
+      window.location.assign('/subscription-expired');
+      return Promise.reject(error);
+    }
+
     if (
       error.response?.status === 401 &&
       original &&
