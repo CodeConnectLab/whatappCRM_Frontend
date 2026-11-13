@@ -14,18 +14,20 @@ import { MetaWebhookStatusBanner } from '../components/settings/MetaWebhookStatu
 import { MetaSetupStatus } from '../components/settings/MetaSetupStatus.tsx';
 import { TwilioSettingsPanels } from '../components/settings/TwilioSettingsPanels.tsx';
 import { CrmBridgePanel } from '../components/settings/CrmBridgePanel.tsx';
+import { SubscriptionPanel } from '../components/settings/SubscriptionPanel.tsx';
 import { MediaStoragePanel } from '../components/settings/MediaStoragePanel.tsx';
 import { SHOW_TWILIO_UI } from '../config/features.ts';
 import { visibleWhatsappSenders } from '../lib/visibleSenders.ts';
 import { CardNote, PageHeader, WorkspaceCard } from '../components/workspace/WorkspaceSurface.tsx';
 
-type SettingsTab = 'channel' | 'senders' | 'crm' | 'company';
+type SettingsTab = 'channel' | 'senders' | 'crm' | 'company' | 'subscription';
 
 const TABS: { key: SettingsTab; name: string; hint: string }[] = [
   { key: 'channel', name: 'WhatsApp channel', hint: 'Meta' },
   { key: 'senders', name: 'Senders', hint: 'Numbers' },
   { key: 'crm', name: 'CRM bridge', hint: 'Leads' },
   { key: 'company', name: 'Company', hint: 'Profile' },
+  { key: 'subscription', name: 'Subscription', hint: 'Plan' },
 ];
 
 export function SettingsPage() {
@@ -518,6 +520,8 @@ export function SettingsPage() {
               </WorkspaceCard>
             )
           ) : null}
+
+          {tab === 'subscription' ? <SubscriptionPanel /> : null}
         </div>
       </div>
     </div>

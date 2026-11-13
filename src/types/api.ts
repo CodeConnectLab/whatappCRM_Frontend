@@ -5,6 +5,44 @@ export type Paginated<T> = {
   limit: number;
 };
 
+export type SubscriptionKind = 'active' | 'expiring_soon' | 'expired';
+
+/** Per-membership state carried on `/api/me`, enough to decide whether to show the wall. */
+export type SubscriptionSummary = {
+  plan: string;
+  status: string;
+  endDate: string | null;
+  userLimit: number;
+  kind: SubscriptionKind;
+  daysRemaining: number;
+  isExpired: boolean;
+  isExpiringSoon: boolean;
+};
+
+/** Full detail from `/api/subscription`, which stays readable while expired. */
+export type SubscriptionDetail = {
+  companyId: string;
+  companyName: string;
+  subscription: {
+    plan: string;
+    status: string;
+    startDate: string | null;
+    endDate: string | null;
+    userLimit: number;
+    priceAmount: number;
+    currency: string;
+    gstPercent: number;
+    billingCycle: string;
+    notes?: string;
+  } | null;
+  usersUsed: number;
+  userLimit: number;
+  kind: SubscriptionKind;
+  daysRemaining: number;
+  isExpired: boolean;
+  isExpiringSoon: boolean;
+};
+
 export type Wallet = {
   _id: string;
   companyId: string;

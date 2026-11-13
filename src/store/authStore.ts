@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { SubscriptionSummary } from '../types/api.ts';
 
 export type AuthUser = {
   id: string;
@@ -14,6 +15,7 @@ export type MembershipSummary = {
   companyId: string;
   companyName: string;
   role: 'company_admin' | 'agent';
+  subscription?: SubscriptionSummary;
 };
 
 export type MeResponse = {
@@ -35,6 +37,20 @@ function deriveWorkspaceRole(
   return m.role === 'company_admin' ? 'company_admin' : 'agent';
 }
 
+/**
+ * Kept in the store (and persisted) rather than fetched by the guard, so a page reload
+ * decides immediately whether to show the expired wall instead of flashing the app first.
+ * Super admins never carry one — they are exempt from the gate server-side too.
+ */
+function deriveSubscription(
+  user: AuthUser | null,
+  companyId: string | null,
+  memberships: MembershipSummary[],
+): SubscriptionSummary | null {
+  if (!user || user.isSuperAdmin || !companyId) return null;
+  return memberships.find((m) => m.companyId === companyId)?.subscription ?? null;
+}
+
 type AuthState = {
   accessToken: string | null;
   refreshToken: string | null;
@@ -43,6 +59,7 @@ type AuthState = {
   companyName: string | null;
   memberships: MembershipSummary[];
   workspaceRole: 'company_admin' | 'agent' | null;
+  subscription: SubscriptionSummary | null;
   theme: 'light' | 'dark';
   sessionReady: boolean;
   setAuth: (input: {
@@ -70,6 +87,7 @@ export const useAuthStore = create<AuthState>()(
       companyName: null,
       memberships: [],
       workspaceRole: null,
+      subscription: null,
       theme: 'light',
       sessionReady: false,
       setAuth: ({ accessToken, refreshToken, user, companyId, companyName }) => {
@@ -82,6 +100,7 @@ export const useAuthStore = create<AuthState>()(
           companyId: cid,
           companyName: companyName ?? get().companyName,
           workspaceRole: deriveWorkspaceRole(user, cid, memberships),
+          subscription: deriveSubscription(user, cid, memberships),
         });
       },
       setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
@@ -91,6 +110,7 @@ export const useAuthStore = create<AuthState>()(
           companyId,
           companyName: companyName ?? get().companyName,
           workspaceRole: deriveWorkspaceRole(user, companyId, memberships),
+          subscription: deriveSubscription(user, companyId, memberships),
         });
       },
       applyMe: (data) => {
@@ -117,6 +137,7 @@ export const useAuthStore = create<AuthState>()(
           companyId: nextCompanyId,
           companyName: companyName ?? null,
           workspaceRole: deriveWorkspaceRole(user, nextCompanyId, memberships),
+          subscription: deriveSubscription(user, nextCompanyId, memberships),
           sessionReady: true,
         });
       },
@@ -130,6 +151,7 @@ export const useAuthStore = create<AuthState>()(
           companyName: null,
           memberships: [],
           workspaceRole: null,
+          subscription: null,
           sessionReady: false,
         }),
       toggleTheme: () =>
@@ -149,6 +171,7 @@ export const useAuthStore = create<AuthState>()(
         user: s.user,
         companyId: s.companyId,
         companyName: s.companyName,
+        subscription: s.subscription,
         theme: s.theme,
       }),
       onRehydrateStorage: () => (state) => {

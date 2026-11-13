@@ -11,6 +11,7 @@ import { LeadsPage } from './pages/LeadsPage.tsx';
 import { DashboardPage } from './pages/DashboardPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
 import { SettingsPage } from './pages/SettingsPage.tsx';
+import { SubscriptionExpiredPage } from './pages/SubscriptionExpiredPage.tsx';
 import { TeamPage } from './pages/TeamPage.tsx';
 import { TemplatesPage } from './pages/TemplatesPage.tsx';
 import { WalletPage } from './pages/WalletPage.tsx';
@@ -33,6 +34,8 @@ export default function App() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/data-deletion" element={<DataDeletionPage />} />
         <Route element={<RequireAuth />}>
+          {/* Outside AppShell on purpose: no sidebar or header to click through. */}
+          <Route path="subscription-expired" element={<SubscriptionExpiredPage />} />
           <Route element={<AppShell />}>
             <Route index element={<DashboardPage />} />
             <Route element={<SuperOnly />}>
